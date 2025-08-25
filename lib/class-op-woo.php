@@ -175,6 +175,7 @@ class OP_Woo{
             ),
             'callback' => array( $this, 'clear_all_product_cache' ),
         );
+       
         return $tools;
     }
 
@@ -806,260 +807,265 @@ class OP_Woo{
     }
 
     public function get_variations($product_id,$warehouse_id = 0,$incl_tax = false){
+        try{
+            $cache_key = 'op_variations_product_cache_'.$warehouse_id.'_'.$product_id;
+            $cache_group = 'products';
 
-        $cache_key = 'op_variations_product_cache_'.$warehouse_id.'_'.$product_id;
-        $cache_group = 'products';
-
-        $cached_data = wp_cache_get( $cache_key, $cache_group );
-
-        if ( false !== $cached_data )
-        {
-            //update qty
-            return $cached_data;
-        }else{
-            global $op_warehouse;
-            $core = $this->_core;
-            $variation = new WC_Product_Variable($product_id);
-            
-            $item_variations = $this->get_available_variations($variation,$warehouse_id);
-            $variant_products_with_attribute = array();
-            $variation_attributes   = $variation->get_variation_attributes();
-    
-            $price_list = array();
-            $regular_price_list = array();
-            $variations = array();
-            $qty_list = array();
-            $child_products = array();
-            foreach($item_variations as $a_p)
+            $cached_data = wp_cache_get( $cache_key, $cache_group );
+            if ( false !== $cached_data )
             {
-                $variation_id = $a_p['variation_id'];
-                if( !$op_warehouse->is_instore($warehouse_id,$variation_id))
+                //update qty
+                return $cached_data;
+            }else{
+                global $op_warehouse;
+                $core = $this->_core;
+                $variation = new WC_Product_Variable($product_id);
+                if(!$variation)
                 {
-                    continue;
+                    return false;
                 }
-                
-                $variant_product = wc_get_product($variation_id);
-                $taxes = $this->_tax($variant_product,$warehouse_id);
-                //$a_p_price =  wc_get_price_including_tax($variant_product);
-                $a_p_price =  $taxes['price_incl_tax'];
-                
-    
-                
-                //end update price
-    
-                $variant_products_with_attribute[] = array(
-                    'value_id' => $variation_id,
-                    'price' => $a_p_price,
-                    'attributes' => $a_p['attributes']
-                );
-                $qty = $variant_product->get_stock_quantity();
-                if($warehouse_id > 0)
+                $item_variations = $this->get_available_variations($variation,$warehouse_id);
+                $variant_products_with_attribute = array();
+                $variation_attributes   = $variation->get_variation_attributes();
+        
+                $price_list = array();
+                $regular_price_list = array();
+                $variations = array();
+                $qty_list = array();
+                $child_products = array();
+                foreach($item_variations as $a_p)
                 {
-                    $qty = $op_warehouse->get_qty($warehouse_id,$variation_id);
-                }
-                if(!$qty)
-                {
-                    $qty = 0;
-                }
-                
-                $barcode = $core->getBarcode($variation_id);
-                $child_products[$variation_id] = array(
-                    'id' => $variation_id,
-                    'barcode' => $barcode,
-                    'qty' => $qty,
-                    'price_included_tax' => $this->_price_included_tax($variant_product,$warehouse_id),
-                    'final_price' => $taxes['price_excl_tax'],
-                    'final_price_incl_tax' => $taxes['price_incl_tax'],
-                    'regular_price_with_tax' => $taxes['regular_price_with_tax'],
-                    'regular_price_excl_tax' => $taxes['regular_price_excl_tax'],
-                    'tax_amount' => $taxes['tax_amount'],
-                    'manage_stock' => $this->_manage_stock($variant_product,$warehouse_id),
-                );
-    
-            }
-            foreach($variation_attributes as $key => $variants)
-            {
-                $variants = $this->sortAttributeOptions($key,$variants);
-                $label = $key;
-                if(strpos($key,'pa_') === false)
-                {
-                    $key = strtolower(esc_attr(sanitize_title($key)));
-                }else{
-                    $key = urlencode($key);
-                }
-                
-                $options = array();
-                
-                foreach($variants as $v)
-                {
-                    $option_label = $v;
-                    $values = array();
-                    $id_values = array();
-                    $values_all = array();
-                    $values_price = array();
-                    
-                    $stock_manager = true;
-                    foreach($variant_products_with_attribute as $vp)
+                    $variation_id = $a_p['variation_id'];
+                    if( !$op_warehouse->is_instore($warehouse_id,$variation_id))
                     {
-                        $attribute_key_1 = strtolower('attribute_'.$key); // sanitize_title
-                        $is_all = false;
+                        continue;
+                    }
+                    
+                    $variant_product = wc_get_product($variation_id);
+                    $taxes = $this->_tax($variant_product,$warehouse_id);
+                    //$a_p_price =  wc_get_price_including_tax($variant_product);
+                    $a_p_price =  $taxes['price_incl_tax'];
+                    
+        
+                    
+                    //end update price
+        
+                    $variant_products_with_attribute[] = array(
+                        'value_id' => $variation_id,
+                        'price' => $a_p_price,
+                        'attributes' => $a_p['attributes']
+                    );
+                    $qty = $variant_product->get_stock_quantity();
+                    if($warehouse_id > 0)
+                    {
+                        $qty = $op_warehouse->get_qty($warehouse_id,$variation_id);
+                    }
+                    if(!$qty)
+                    {
+                        $qty = 0;
+                    }
+                    
+                    $barcode = $core->getBarcode($variation_id);
+                    $child_products[$variation_id] = array(
+                        'id' => $variation_id,
+                        'barcode' => $barcode,
+                        'qty' => $qty,
+                        'price_included_tax' => $this->_price_included_tax($variant_product,$warehouse_id),
+                        'final_price' => $taxes['price_excl_tax'],
+                        'final_price_incl_tax' => $taxes['price_incl_tax'],
+                        'regular_price_with_tax' => $taxes['regular_price_with_tax'],
+                        'regular_price_excl_tax' => $taxes['regular_price_excl_tax'],
+                        'tax_amount' => $taxes['tax_amount'],
+                        'manage_stock' => $this->_manage_stock($variant_product,$warehouse_id),
+                    );
+        
+                }
+                foreach($variation_attributes as $key => $variants)
+                {
+                    $variants = $this->sortAttributeOptions($key,$variants);
+                    $label = $key;
+                    if(strpos($key,'pa_') === false)
+                    {
+                        $key = strtolower(esc_attr(sanitize_title($key)));
+                    }else{
+                        $key = urlencode($key);
+                    }
+                    
+                    $options = array();
+                    
+                    foreach($variants as $v)
+                    {
+                        $option_label = $v;
+                        $values = array();
+                        $id_values = array();
+                        $values_all = array();
+                        $values_price = array();
                         
-                        if(isset($vp['attributes'][$attribute_key_1]) && ($vp['attributes'][$attribute_key_1] === $v || $vp['attributes'][$attribute_key_1] === ''))
+                        $stock_manager = true;
+                        foreach($variant_products_with_attribute as $vp)
                         {
-                            if($vp['attributes'][$attribute_key_1] === ''){
-                                $is_all = true;
-                            }
-                            if($vp['value_id'])
+                            $attribute_key_1 = strtolower('attribute_'.$key); // sanitize_title
+                            $is_all = false;
+                            
+                            if(isset($vp['attributes'][$attribute_key_1]) && ($vp['attributes'][$attribute_key_1] === $v || $vp['attributes'][$attribute_key_1] === ''))
                             {
-    
-                                $taxonomy = $key;
-                                $term = get_term_by('slug', $v, $taxonomy);
-                                if($term)
-                                {
-                                    $option_label = $term->name;
-                                    
+                                if($vp['attributes'][$attribute_key_1] === ''){
+                                    $is_all = true;
                                 }
-                                $child_id = $vp['value_id'];
-                                $child_data = isset($child_products[$child_id]) ? $child_products[$child_id] : array();
-
-                                $barcode = isset($child_data['barcode']) ? $child_data['barcode'] : $core->getBarcode($vp['value_id']);
-                                if($barcode)
+                                if($vp['value_id'])
                                 {
-                                    
-                                    if(!empty($child_data))
+        
+                                    $taxonomy = $key;
+                                    $term = get_term_by('slug', $v, $taxonomy);
+                                    if($term)
+                                    {
+                                        $option_label = $term->name;
+                                        
+                                    }
+                                    $child_id = $vp['value_id'];
+                                    $child_data = isset($child_products[$child_id]) ? $child_products[$child_id] : array();
+
+                                    $barcode = isset($child_data['barcode']) ? $child_data['barcode'] : $core->getBarcode($vp['value_id']);
+                                    if($barcode)
                                     {
                                         
-                                        $values_price[$barcode] = $child_data['final_price'];
-                                        $values[] = $barcode;
-                                        
-                                        if($is_all){
-                                            $values_all[] = $barcode;
-                                        }else{
-                                            $id_values[] = $child_id;
-                                        }
-                                        if($incl_tax)
+                                        if(!empty($child_data))
                                         {
-                                            $price_list[] =  $child_data['final_price_incl_tax'];
-                                            if($child_data['regular_price_with_tax'])
+                                            
+                                            $values_price[$barcode] = $child_data['final_price'];
+                                            $values[] = $barcode;
+                                            
+                                            if($is_all){
+                                                $values_all[] = $barcode;
+                                            }else{
+                                                $id_values[] = $child_id;
+                                            }
+                                            if($incl_tax)
                                             {
-                                                $regular_price_list[] =  $child_data['regular_price_with_tax'];
+                                                $price_list[] =  $child_data['final_price_incl_tax'];
+                                                if($child_data['regular_price_with_tax'])
+                                                {
+                                                    $regular_price_list[] =  $child_data['regular_price_with_tax'];
+                                                }
+                                                
+                                            }else{
+                                                $price_list[] =  $child_data['final_price'];
+                                                if($child_data['regular_price_excl_tax'])
+                                                {
+                                                    $regular_price_list[] =  $child_data['regular_price_excl_tax'];
+                                                }
                                             }
                                             
-                                        }else{
-                                            $price_list[] =  $child_data['final_price'];
-                                            if($child_data['regular_price_excl_tax'])
+                                            $qty_list[$barcode] = 1 * $child_data['qty'];
+            
+                                            
+            
+                                            if($child_data && !$child_data['manage_stock'])
                                             {
-                                                $regular_price_list[] =  $child_data['regular_price_excl_tax'];
+                                                $stock_manager = false;
                                             }
                                         }
-                                        
-                                        $qty_list[$barcode] = 1 * $child_data['qty'];
-        
-                                        
-        
-                                        if($child_data && !$child_data['manage_stock'])
-                                        {
-                                            $stock_manager = false;
-                                        }
                                     }
+        
                                 }
-    
+        
                             }
-    
                         }
-                    }
-                    if(!empty($values_all))
-                    {
-                        $values_all = array_unique($values_all);
-                    }
-                    if(!empty($values))
-                    {
-                        $values = array_unique($values);
-                        $diff = array_diff($values,$values_all);
-                        if(!empty($diff))
+                        if(!empty($values_all))
                         {
-                            $values = $diff;
+                            $values_all = array_unique($values_all);
                         }
-                    }
-                    $option_label = rawurldecode( $option_label);
-                    
-                    
-                    $option_tmp = array(
-                        'title' => esc_html($option_label),
-                        'slug' => $v,
-                        'values' => $values,
-                        'id_values' => array_unique($id_values),
-                        'prices' => $values_price,
-                    );
-                    
-                    if($stock_manager)
-                    {
-                        $stock_status = '';
-                        $value_qty = 0;
-                        foreach($values as $barcode)
+                        if(!empty($values))
                         {
-                            if(isset($qty_list[$barcode]))
+                            $values = array_unique($values);
+                            $diff = array_diff($values,$values_all);
+                            if(!empty($diff))
                             {
-                                $value_qty += $qty_list[$barcode];
+                                $values = $diff;
                             }
                         }
-                        $option_tmp['stock_status'] = $stock_status;
-                        $option_tmp['stock_qty'] = $value_qty;
+                        $option_label = rawurldecode( $option_label);
+                        
+                        
+                        $option_tmp = array(
+                            'title' => esc_html($option_label),
+                            'slug' => $v,
+                            'values' => $values,
+                            'id_values' => array_unique($id_values),
+                            'prices' => $values_price,
+                        );
+                        
+                        if($stock_manager)
+                        {
+                            $stock_status = '';
+                            $value_qty = 0;
+                            foreach($values as $barcode)
+                            {
+                                if(isset($qty_list[$barcode]))
+                                {
+                                    $value_qty += $qty_list[$barcode];
+                                }
+                            }
+                            $option_tmp['stock_status'] = $stock_status;
+                            $option_tmp['stock_qty'] = $value_qty;
+                        }
+        
+                        $option_tmp = apply_filters('op_product_variation_attribute_option_data',$option_tmp);
+                        $options[] = $option_tmp;
+                        
                     }
-    
-                    $option_tmp = apply_filters('op_product_variation_attribute_option_data',$option_tmp);
-                    $options[] = $option_tmp;
+        
+                    $variant = array(
+                        'title' => wc_attribute_label( $label ),
+                        'slug' => sanitize_title($key),
+                        'options' => $options
+                    );
+                    $variations[] = $variant;
                     
                 }
-    
-                $variant = array(
-                    'title' => wc_attribute_label( $label ),
-                    'slug' => sanitize_title($key),
-                    'options' => $options
-                );
-                $variations[] = $variant;
-                
-            }
-    
-            /*
-            $variations = array(
-                0 => array(
-                    'title' => 'Variation Color',
-                    'slug' => 'color',
-                    'options' => array(
-                        0 => array(
-                            'title' => 'Red',
-                            'slug' => 'red',
-                            'values' => array(100,101),
-                            'prices' => array()
-                        ),
-                        1 => array(
-                            'title' => 'Blue',
-                            'slug' => 'blue',
-                            'values' => array(102,103),
-                            'prices' => array()
+        
+                /*
+                $variations = array(
+                    0 => array(
+                        'title' => 'Variation Color',
+                        'slug' => 'color',
+                        'options' => array(
+                            0 => array(
+                                'title' => 'Red',
+                                'slug' => 'red',
+                                'values' => array(100,101),
+                                'prices' => array()
+                            ),
+                            1 => array(
+                                'title' => 'Blue',
+                                'slug' => 'blue',
+                                'values' => array(102,103),
+                                'prices' => array()
+                            )
                         )
                     )
-                )
-            );
-            */
-            
-            $result = array(
-                'variations' => $variations,
-                'price_list' => $price_list,
-                'regular_price_list' => $regular_price_list,
-                'qty_list' => $qty_list
-            );
-            wp_cache_set( $cache_key, $result, $cache_group );
-        }
+                );
+                */
+                
+                $result = array(
+                    'variations' => $variations,
+                    'price_list' => $price_list,
+                    'regular_price_list' => $regular_price_list,
+                    'qty_list' => $qty_list
+                );
+                wp_cache_set( $cache_key, $result, $cache_group );
+            }
 
-        
-        return $result;
+            
+            return $result;
+        }catch( Exception $e){
+            return false;
+        }
     }
     private function _manage_stock($product,$warehouse_id){
         $manage_stock = $product->get_manage_stock();
         $backorders = $product->get_backorders();
-        if(!$manage_stock && $backorders == 'yes')
+        if($manage_stock && $backorders == 'yes')
         {
                 $manage_stock = false;
         }
@@ -1491,10 +1497,11 @@ class OP_Woo{
                             }
                             
                             $variations_result = $this->get_variations($product->get_id(),$warehouse_id,$display_price_with_tax);
-                            $variations = $variations_result['variations'];
-                            $price_list = $variations_result['price_list'];
-                            $regular_price_list = $variations_result['regular_price_list'];
-                            $qty_list = $variations_result['qty_list'];
+                            
+                            $variations = $variations_result ?  $variations_result['variations'] : array();
+                            $price_list = $variations_result ?  $variations_result['price_list'] : array();
+                            $regular_price_list = $variations_result ? $variations_result['regular_price_list'] : array();
+                            $qty_list = $variations_result ? $variations_result['qty_list'] : array();
                             $stock_manager = $product->get_manage_stock();
                             $qty = 0;
                             if($stock_manager && $warehouse_id == 0)
@@ -1684,7 +1691,7 @@ class OP_Woo{
                     
                     $parent_id = $tmp_parent_id ;
                     $parent_post = get_post($parent_id);
-                    if($parent_post && $post_type == 'product_variation')
+                    if($parent_post && $parent_post->post_type == 'product' && $post_type == 'product_variation')
                     {
                         
                         
@@ -1839,7 +1846,7 @@ class OP_Woo{
             $data = $cached_data;
         }else{
             $tmp_v = $this->get_variations($product_id,$warehouse_id);
-            $variations = isset($tmp_v['variations']) ? $tmp_v['variations'] : array();
+            $variations = $tmp_v && isset($tmp_v['variations']) ? $tmp_v['variations'] : array();
             $child_products = array();
             $data = array(
                 'id' => $product_id,

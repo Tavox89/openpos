@@ -2831,9 +2831,15 @@ class Openpos_Admin{
         $sessions = $this->_session->getActiveSessions();
         $session_data = array();
 
+       
         foreach($sessions as $key => $s)
         {
             $session_key = isset($s['session'] )  ? $s['session'] : '';
+            $session_key = isset($s['session_id'] )  ? $s['session_id'] : $session_key;
+            if(!$session_key)
+            {
+                continue;
+            }
             if(strpos($session_key,'op-api-') === 0)
             {
                 $tmp_location = ( isset($s['user']['location']) && $s['user']['location'] ) ?  json_decode(stripslashes($s['user']['location']),true): array();
@@ -2851,16 +2857,16 @@ class Openpos_Admin{
                 $created_at = $this->core->render_ago_date_by_time_stamp($created_at);
                 $_register_location = '';
                 $tmp = array(
-                    $s['session'],
+                    $session_key,
                     $s['user']['username'],
                     $created_at,
                     $ip,
                     $_register_location,
                     $location,
-                    '<a href="javascript:void(0);" class="unlink-session" data-id="'.$s['session'].'">'.__( 'Unlink', 'openpos' ).'</a>',
+                    '<a href="javascript:void(0);" class="unlink-session" data-id="'.$session_key.'">'.__( 'Unlink', 'openpos' ).'</a>',
                 );
     
-                $session_data[] = $tmp;
+                //$session_data[] = $tmp;
             }else{
                 $login_cashdrawer_id = isset($s['login_cashdrawer_id']) ? $s['login_cashdrawer_id'] : 0;
                 $tmp_location = ( isset($s['location']) && $s['location'] ) ?  json_decode(stripslashes($s['location']),true): array();
@@ -2884,13 +2890,13 @@ class Openpos_Admin{
                 $created_at = $s['logged_time'];
                 $created_at = $this->core->render_ago_date_by_time_stamp($created_at);
                 $tmp = array(
-                    $s['session'],
+                    $session_key,
                     $s['username'],
                     $created_at,
                     $ip,
                     $_register_location,
                     $location,
-                    '<a href="javascript:void(0);" class="unlink-session" data-id="'.$s['session'].'">'.__( 'Unlink', 'openpos' ).'</a>',
+                    '<a href="javascript:void(0);" class="unlink-session" data-id="'.$session_key.'">'.__( 'Unlink', 'openpos' ).'</a>',
                 );
     
                 $session_data[] = $tmp;

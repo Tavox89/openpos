@@ -58,7 +58,7 @@ $register = $op_register->get((int)$id);
 #Protect\with('form.php', 'my_password'); //uncomment if you want protect your kitchen screen
 ?>
 <?php if(!empty($register)):  ?>
-<html lang="en" style="height: calc(100% - 0px);">
+<html lang="en" >
 <head>
     <meta charset="utf-8">
     <title><?php echo __( 'Bill Screen', 'openpos' ); ?> - <?php echo $register['name']; ?></title>

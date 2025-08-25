@@ -222,6 +222,7 @@
     "LABEL_SEND_CUSTOMER_RECEIPT": "Send receipt to customer email",
     "LABEL_GIFT_RECEIPT": "Gift receipt",
     "LABEL_MARK_TAKEAWAY": "Is a takeaway paid",
+    "LABEL_PAYMENT_FEE": "Payment processing fee",
     "LABEL_MARK_LAYBUY": "is a LayBuy"
   },
   "DASHBOARD": {

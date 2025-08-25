@@ -50,6 +50,7 @@ if(!class_exists('OP_Warehouse'))
                     )
 
             );
+            add_filter('woocommerce_debug_tools',array($this,'woocommerce_debug_tools'),11,1);
         }
 
         function _op_warehouses_func($atts){
@@ -124,6 +125,18 @@ if(!class_exists('OP_Warehouse'))
                 echo ob_get_clean();
             }
             
+        }
+        public function woocommerce_debug_tools($tools){
+            
+            $tools['op_instore_product_bulk'] = array(
+                'name'   => __( 'Bulk OpenPOS product instore', 'openpos' ),
+                'button' => __( 'Update', 'openpos' ),
+                'desc'   => sprintf(
+                    __( 'manual update instore parent product base on child.', 'openpos' )
+                ),
+                'callback' => array( $this, 'op_instore_product_bulk' ),
+            );
+            return $tools;
         }
         
         public function warehouses(){
@@ -372,17 +385,72 @@ if(!class_exists('OP_Warehouse'))
                 $meta_key = $this->_meta_website_instore;
                 update_post_meta($product_id,$meta_key,'yes');
             }
+            $post_parent = get_post_parent($product_id);
+            if($post_parent )
+            {
+                $parent_id = $post_parent->ID;
+                if($parent_id > 0 && $parent_id != $product_id)
+                {
+                    $this->parent_variable_instore($warehouse_id,$parent_id);
+                }
+            }
+            
 
         }
         public function add_instore($warehouse_id = 0,$product_id = 0){
+            
             if($warehouse_id > 0)
             {
                 $meta_key_hide_instore = $this->_meta_website_instore.'_'.$warehouse_id; //value = no is instore
                 update_post_meta($product_id,$meta_key_hide_instore,'no');
-
             }else{
                 $meta_key = $this->_meta_website_instore;
                 delete_post_meta($product_id,$meta_key,'yes');
+            }
+
+            $post_parent = get_post_parent($product_id);
+            if($post_parent )
+            {
+                $parent_id = $post_parent->ID;
+                if($parent_id > 0 && $parent_id != $product_id)
+                {
+                    $this->add_instore($warehouse_id ,$parent_id);
+                }
+            }
+        }
+        public function parent_variable_instore($warehouse_id,$product_id,$is_instore = false)
+        {
+            if($is_instore)
+            {
+                $this->add_instore($warehouse_id,$product_id);
+            }else{
+                $child_products = get_posts(array(
+                    'post_parent' => $product_id,
+                    'post_type' => 'product_variation',
+                    'post_status' => 'publish',
+                    'posts_per_page' => -1,
+                    'fields' => 'ids'
+                ));
+                
+                if(!empty($child_products))
+                {
+                    $instore = false;
+                    foreach($child_products as $child_id)
+                    {
+                        $instore = $this->is_instore($warehouse_id,$child_id);
+                        if($instore){
+                            break;
+                        }
+                    }
+                    if($instore)
+                    {
+                        $this->add_instore($warehouse_id,$product_id);
+                    }else{
+                        $this->remove_instore($warehouse_id,$product_id);
+                    }
+                }else{
+                    $this->remove_instore($warehouse_id,$product_id);
+                }
             }
         }
         public function add_instore_website($product_id)
@@ -655,6 +723,37 @@ if(!class_exists('OP_Warehouse'))
             }
             return $allow;
     
+        }
+
+        public function op_instore_product_bulk(){
+            global $wpdb;
+            $warehouses = get_posts(
+                array(
+                    'post_type' => $this->_post_type,
+                    'post_status' => 'publish',
+                    'posts_per_page' => -1,
+                )
+            );
+            $warehouse_ids = array();
+            if(!empty($warehouses))
+            {
+                foreach($warehouses as $w)
+                {
+                    $warehouse_ids[] = $w->ID;
+                }
+            }
+            foreach($warehouse_ids as $warehouse_id)
+            {
+                $term = $this->_meta_website_instore.'_'.$warehouse_id; //value = no is instore
+                $sql = $wpdb->prepare("SELECT post.post_parent FROM  `{$wpdb->postmeta}` AS post_meta LEFT JOIN  `{$wpdb->posts}` AS post ON post.ID = post_meta.post_id WHERE  post_meta.meta_key  LIKE '%s' AND post.post_parent > 0 GROUP BY post.post_parent",'%'.esc_sql($term).'%');
+                $found_query = $wpdb->get_results( $sql );
+                foreach($found_query as $parent)
+                {
+                    $parent_id = $parent->post_parent;
+                    $this->parent_variable_instore($warehouse_id,$parent_id);
+                }
+            }
+            return __('Instore OpenPOS Product update success','openpos');
         }
 
     }

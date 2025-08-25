@@ -43,90 +43,59 @@ if(!class_exists('OP_REST_API_Product'))
                 ) 
             );
         }
+        
         private function _formatApiProduct($product_data,$session_data){
-            $result = array();
-            $currency = $session_data['setting']['currencies'];
+            
+            $currency = $session_data['setting']['currency'];
             $decimal = $currency['decimal'];
-            $fields = array(
-                'id' => 'id',
-                'parent_id' => 'parent_id',
-                'name' => 'name',
-                'description' => 'description',
-                'sku' => 'sku',
-                'barcode' => 'barcode',
-                'image' => 'image',
-                'custom_notes' => 'custom_notes',
-                'tax' => 'taxes',
-                'tax_amount' => 'tax_amount',
-                'price' => 'price',
-                'price_included_tax' => 'price_included_tax',
-                'special_price' => 'special_price',
-                'sale_from' => 'special_start_at',
-                'sale_to' => 'special_end_at',
-                'discount_rules' => 'discount_rules',
-                'stock_status' => 'stock_status',
-                'stock_unit' => 'stock_unit',
-                'price_incl_tax' => 'price_incl_tax',
-                'regular_price' => 'regular_price',
-                'qty' => 'stock_qty',
-                'decimal_qty' => 'decimal_qty',
-                'manage_stock' => 'manage_stock',
-                'min_qty' => 'min_qty',
-                'max_qty' => 'max_qty',
-                'allow_decal' => 'allow_decal',
-                'allow_change_price' => 'allow_change_price',
-                'product_type' => 'product_type',
-                'type' => 'type',
-                'is_featured' => 'is_featured',
-                'display' => 'is_display',
-                'display_search' => 'is_searchable',
-                'categories' => 'categories',
-                //'createdAt' => 'created_at',
-                //'updatedAt' => 'updated_at',
-                'variations' => 'variations',
-                'bundles' => 'bundles',
-                'options' => 'options',
-                'group_items' => 'group_items',
-                'kitchen_area' => 'kitchen_area'
+            $price = $this->_convertToCent($product_data['price'],$decimal);
+            $priceInclTax = $this->_convertToCent($product_data['price_incl_tax'],$decimal);
+            $specialPrice = $this->_convertToCent($product_data['special_price'],$decimal);
+            $product = array(
+                'id' => $product_data['id'],
+                'parentId' => $product_data['parent_id'],
+                'parentProduct' => null, // Reference to parent product if this is a variation or bundle
+                'name' => $product_data['name'],
+                'description' => isset($product_data['description']) ? $product_data['description'] : '',
+                'sku' => $product_data['sku'],
+                'barcode' => $product_data['barcode'],
+                'image' => $product_data['image'],
+                'groupItems' => array(),
+                'bundles' => $product_data['bundles'],
+                'options' => $product_data['options'],
+                'variations' => $product_data['variations'],
+                'customNotes' => $product_data['custom_notes'],
+                'taxes' =>  isset($product_data['tax']) ? $product_data['tax'] : array(),
+                'price' => $price,
+                'priceInclTax' => $priceInclTax,
+                'isPriceInclTax' => isset($product_data['price_included_tax']) && $product_data['price_included_tax'] == 1 ? true : false,
+                'specialPrice' => $specialPrice,
+                'specialStartAt' => isset($product_data['special_start_at']) ? $product_data['special_start_at'] : 0,
+                'specialEndAt' => isset($product_data['special_end_at']) ? $product_data['special_end_at'] : 0, 
+                'discountRules' => isset($product_data['discount_rules']) ? $product_data['discount_rules'] : array(),
+                'stockStatus' => $product_data['stock_status'],
+                'stockUnit' => isset($product_data['stock_unit']) ? $product_data['stock_unit'] : '',
+                'stockQty' => $product_data['qty'],
+                'decimalQty' => $product_data['decimal_qty'], // number of decimal places for quantity 
+                'manageStock' => $product_data['manage_stock'],
+                'minQty' =>  isset($product_data['min_qty']) ? $product_data['min_qty'] : 0, // Minimum quantity for purchase
+                'maxQty' =>  isset($product_data['max_qty']) ? $product_data['max_qty'] : 0, // Maximum quantity for purchase
+                'allowDecal' => isset($product_data['allow_decal']) && $product_data['allow_decal'] == 'yes' ? true : false, 
+                'allowChangePrice' => $product_data['allow_change_price'], 
+                'productType' => isset($product_data['product_type']) ? $product_data['product_type'] : '', // product type, simple, variable, bundle, group
+                'type' => $product_data['type'], // display type
+                'isFeatured' => isset($product_data['is_featured']) ? $product_data['is_featured'] : false, // is featured product
+                'isDisplay' => $product_data['display'], 
+                'isSearchable' => isset($product_data['is_searchable']) ? $product_data['is_searchable'] : true, // is searchable product
+                'isSync' => false,
+                'createdAt' => 0,
+                'updatedAt' => 0,
+                'productCategories' => $product_data['categories'], 
+                'kitchenArea' => isset($product_data['kitchen_area']) ? $product_data['kitchen_area'] : array(), // kitchen area
+                'additionInfo' => isset($product_data['addition_info']) ? $product_data['addition_info'] : array(), // kitchen area
             );
-            if(!isset($product_data['discount_rules'])){
 
-                $product_data['discount_rules'] = array();
-            }
-            $qty_decimal = isset($product_data['decimal_qty']) && $product_data['decimal_qty'] == 'yes' ? $decimal : 0;
-            foreach($fields as $api_field => $app_field)
-            {
-                switch($api_field)
-                {
-                    case 'qty':
-                        $pow = pow(10, $qty_decimal);
-                        $number = isset($product_data[$api_field]) && $product_data[$api_field]  ? 1 * $product_data[$api_field]*$pow : 0;
-                        $result[$app_field] = floor($number);
-                        break;
-                    case 'decimal_qty':
-                        $result[$app_field] = $qty_decimal;
-                        break;
-                    case 'tax_amount':
-                    case 'special_price':
-                    case 'price_incl_tax':
-                    case 'price':
-                        $pow = pow(10, $decimal);
-                        $number = isset($product_data[$api_field]) && $product_data[$api_field]  ? 1 * $product_data[$api_field]*$pow : 0;
-                        $result[$app_field] = floor($number);
-                        break;
-                    case 'price_included_tax':
-                        $result[$app_field] = isset($product_data[$api_field]) && $product_data[$api_field] == 1 ? true : false;
-                        break;
-                    case 'allow_decal':
-                        $result[$app_field] = isset($product_data[$api_field]) && $product_data[$api_field] == 'yes' ? true : false;
-                        break;
-                    default:
-                        $result[$app_field] = isset($product_data[$api_field]) ? $product_data[$api_field] : '';
-                        break; 
-                }
-            }
-
-            return $result;
+            return $product;
         }
         public function products($request)
         {

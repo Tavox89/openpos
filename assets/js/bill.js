@@ -1,5 +1,5 @@
 (function($) {
-
+    var last_item = 0;
     var last_data_str = '';
     /* Get into full screen */
     function GoInFullscreen(element) {
@@ -39,6 +39,17 @@
                    
                     $('#bill-content').html(html);
                 }
+
+                let _last_item = $(document).find('#bill-footer').data('last_item');
+                if(last_item != _last_item)
+                {
+                    
+                    last_item = _last_item;
+                    $(document).find('#bill-products').animate({
+                        scrollTop: $("#item-"+last_item).offset().top
+                    }, 1000);
+                }
+                
                 
                 callback();
             },

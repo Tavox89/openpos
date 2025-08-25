@@ -45,6 +45,7 @@ if(!class_exists('OP_Woo_Order'))
             add_filter( 'woocommerce_my_account_my_orders_query', array( $this, 'woocommerce_my_account_my_orders_query' ), 10, 1 );
             
             add_filter('woocommerce_my_account_my_orders_actions',array($this,'woocommerce_my_account_my_orders_actions') , 10, 2);
+            add_action('woocommerce_order_details_after_order_table',array($this,'woocommerce_order_details_after_order_table'),10,1);
             
            
             //add_filter( 'woocommerce_webhook_topic_hooks', array( $this, 'woocommerce_webhook_topic_hooks' ), 10, 2 );
@@ -951,7 +952,22 @@ if(!class_exists('OP_Woo_Order'))
             
             return $actions;
         }
-        
+        public function woocommerce_order_details_after_order_table($order){
+            
+            $remain =  $order->get_meta('_op_remain_paid', true);
+            if(!$remain || $remain <= 0)
+            {
+                return;
+            }
+            ?>
+            <table class="woocommerce-table shop_table order_details">
+            <tr>
+                <th><?php echo __('Debit amount'); ?></th>
+                <td><span style="color:#d32f2f;font-weight:bold;"><?php echo wc_price($remain); ?></span></td>
+            </tr>
+            </table>
+            <?php
+        }
         public function add_order($order_data,$is_clear = false){
 
             global $op_register;

@@ -626,9 +626,11 @@ class Openpos_Front{
     public function getProductPerPage(){
         return apply_filters('op_load_product_per_page',50);
     }
-    public function getTotalPageProduct(){
+    public function getTotalPageProduct($session_data = array()){
         $rowCount = $this->getProductPerPage();
+        $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
         $args = array(
+            'warehouse_id'     => $warehouse_id,
             'posts_per_page'   => $rowCount,
             'offset'           => 0,
             'category'         => '',
@@ -654,8 +656,10 @@ class Openpos_Front{
         $offet = ($current -1) * $rowCount;
         $sortBy = 'title';
         $order = 'ASC';
+        $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
 
         $args = array(
+            'warehouse_id' => $warehouse_id,
             'posts_per_page'   => $rowCount,
             'offset'           => $offet,
             'current_page'           => $current,
@@ -668,7 +672,7 @@ class Openpos_Front{
             'suppress_filters' => false
         );
         $args = apply_filters('op_load_product_args',$args);
-       
+        
         $products = $this->_core->getProducts($args,true);
         if(isset($session_data['total_product_page']))
         {
@@ -679,7 +683,7 @@ class Openpos_Front{
             {
                 $total_page = $products['total_page'];
             }else{
-                $total_page = $this->getTotalPageProduct();
+                $total_page = $this->getTotalPageProduct($session_data);
             }
         }
         $data = array('total_page' => $total_page, 'page' => $current);
@@ -687,7 +691,7 @@ class Openpos_Front{
         $data['product'] = array();
         
         #$login_cashdrawer_id = isset($session_data['login_cashdrawer_id']) ?  $session_data['login_cashdrawer_id'] : 0;
-        $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
+       
         $show_out_of_stock_setting = $this->settings_api->get_option('pos_display_outofstock','openpos_pos');
         if($show_out_of_stock_setting == 'yes')
         {
@@ -2895,13 +2899,18 @@ class Openpos_Front{
 
                     //coupon
                     
-                    if($discount_code && isset($discount_codes[$discount_code]) && isset($discount_codes[$discount_code]['applied_items']) && isset($discount_codes[$discount_code]['applied_items'][$item_local_id]))
+                    if($discount_code)
                     {
-                        $item_discount_code_amount = 1 * $discount_codes[$discount_code]['applied_items'][$item_local_id];
-                        if($item_discount_code_amount)
+                        foreach($discount_codes as $_discount_code)
                         {
-                            $item_total -= $item_discount_code_amount;
+                            if(isset($_discount_code['applied_items']) && isset($_discount_code['applied_items'][$item_local_id]))
+                            $item_discount_code_amount = 1 * $_discount_code['applied_items'][$item_local_id];
+                            if($item_discount_code_amount)
+                            {
+                                $item_total -= $item_discount_code_amount;
+                            }
                         }
+                        
                     }
 
                     $item->set_subtotal($item_total_before_discount);
@@ -3038,48 +3047,7 @@ class Openpos_Front{
 
                     $final_items_discount_amount += $discount_code_excl_tax;
                     $final_items_discount_tax += $discount_code_tax_amount;
-                    /*
-                    $coupon = array(
-                        'code' => $discount_code,
-                        'amount' => $discount_code_excl_tax,
-                        'tax_amount' => $discount_code_tax_amount,
-                        'applied' => array()
-                    );
-                    $coupons[] = $coupon;
-                    foreach($coupons as $c)
-                    {
-                        $coupon_code = $c['code'];
-                        $coupon_object = new WC_Coupon();
-                        $coupon_object->set_virtual( true );
-                        $coupon_object->set_code( $coupon_code );
-                        $coupon_object->set_discount_type( 'fixed_cart' );
-                        $coupon_object->set_amount($c['amount']);
-                        //$coupon_object->set_tax($c['amount']);
-                        $order->apply_coupon($coupon_object);
-                    }*/
-                    // $discounts = new WC_Discounts();
-                    // $discount_items = array($coupon_item);
-
-                    // foreach ( $discount_items as $coupon_item ) {
-                    //     $coupon_code = $coupon_item->get_code();
                     
-
-                    //     // If we do not have a coupon ID (was it virtual? has it been deleted?) we must create a temporary coupon using what data we have stored during checkout.
-                    //     $coupon_object = new WC_Coupon();
-                    //     $coupon_object->set_props( (array) $coupon_item->get_meta( 'coupon_data', true ) );
-                    //     $coupon_object->set_code( $coupon_code );
-                    //     $coupon_object->set_virtual( true );
-
-                    //     // If there is no coupon amount (maybe dynamic?), set it to the given **discount** amount so the coupon's same value is applied.
-                    //     if ( ! $coupon_object->get_amount() ) {
-                    //         $coupon_object->set_amount( $coupon_item->get_discount() + $coupon_item->get_discount_tax() );
-                    //         $coupon_object->set_discount_type( 'fixed_cart' );
-                    //     }
-                    //     if ( $coupon_object ) {
-                    //         $discounts->apply_coupon( $coupon_object, false );
-                    //     }
-                    // }
-                    // $order->set_item_discount_amounts($discounts);
                     
                     do_action('op_add_order_coupon_after',$order,$order_parse_data,$discount_code,$discount_code_amount);
 

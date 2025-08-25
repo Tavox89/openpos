@@ -12,6 +12,7 @@ if(!class_exists('OP_Woo_Cart'))
         private $_core;
         private $_session;
         public $_base_path;
+        public $_filesystem;
         public function __construct($base_path = '')
         {
             $this->_session = new OP_Session();

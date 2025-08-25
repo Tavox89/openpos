@@ -115,22 +115,22 @@ if(!class_exists('OP_REST_API_Order'))
                         if($order_from_term instanceof WC_Order )
                         {
                             $order_id = $order_from_term->get_id();
-                            $orders[$order_id] = $this->woo_class->formatWooOrder($order_id);
+                            $orders[$order_id] = $this->_formatApiOrder($order_id);
                         }
                         if($order_from_order_number instanceof WC_Order )
                         {
                             $order_id = $order_from_order_number->get_id();
-                            $orders[$order_id] = $this->woo_class->formatWooOrder($order_id);
+                            $orders[$order_id] = $this->_formatApiOrder($order_id);
                         }
                         if($order_from_order_number_format instanceof WC_Order )
                         {
                             $order_id = $order_from_order_number_format->get_id();
-                            $orders[$order_id] = $this->woo_class->formatWooOrder($order_id);
+                            $orders[$order_id] = $this->_formatApiOrder($order_id);
                         }
                         if($order_from_order_local_id instanceof WC_Order )
                         {
                             $order_id = $order_from_order_local_id->get_id();
-                            $orders[$order_id] = $this->woo_class->formatWooOrder($order_id);
+                            $orders[$order_id] = $this->_formatApiOrder($order_id);
                         }
                     }
                 }
@@ -169,10 +169,10 @@ if(!class_exists('OP_REST_API_Order'))
                             if($_order instanceof WC_Order )
                             {
                                 $order_id = $_order->get_id();
-                                $formatted_order = $this->woo_class->formatWooOrder($order_id);
+                                $formatted_order = $this->_formatApiOrder($order_id);
                              }else{
                                 $order_id = $_order->ID;
-                                $formatted_order = $this->woo_class->formatWooOrder($order_id);
+                                $formatted_order = $this->_formatApiOrder($order_id);
                              }
                             
                             if(!$formatted_order || empty($formatted_order))
@@ -220,7 +220,7 @@ if(!class_exists('OP_REST_API_Order'))
                 {
                     throw new Exception(__('Order not found','openpos'));
                 }
-                $formatted_order = $this->woo_class->formatWooOrder($order->get_id());
+                $formatted_order = $this->_formatApiOrder($order->get_id());
                 if(!$formatted_order || empty($formatted_order))
                 {
                     throw new Exception(__('Order not found','openpos'));
@@ -264,7 +264,7 @@ if(!class_exists('OP_REST_API_Order'))
                     throw new Exception(__('Order not found','openpos'));
                 }
                 
-                $formatted_order = $this->woo_class->formatWooOrder($order->get_id());
+                $formatted_order = $this->_formatApiOrder($order->get_id());
                 if(!$formatted_order || empty($formatted_order))
                 {
                     throw new Exception(__('Order not found','openpos'));
@@ -310,7 +310,7 @@ if(!class_exists('OP_REST_API_Order'))
                     throw new Exception(__('Order not found','openpos'));
                 }
                 
-                $formatted_order = $this->woo_class->formatWooOrder($order->get_id());
+                $formatted_order = $this->_formatApiOrder($order->get_id());
                 if(!$formatted_order || empty($formatted_order))
                 {
                     throw new Exception(__('Order not found','openpos'));
@@ -482,5 +482,161 @@ if(!class_exists('OP_REST_API_Order'))
             return $this->rest_ensure_response($result);
         }
         
+        public function _formatApiOrderItem($item)
+        {
+            //$currency = $session_data['setting']['currency'];
+            //$decimal = $currency['decimal'];
+            $item = array(
+                'id' => null, // Optional, for SQLite row id
+                'itemType' => '',
+                'itemKey' => '', // Unique key for the item, use check new item or existing item
+
+                'variantId' => null,
+                'productId' => null,
+                'productName' => '',
+                'productSku' => '',
+                'productImage' => '',
+                'barcode' => '',
+                'barcodeDetails' => null,
+                'productPrice' => 0,
+                'productPriceInclTax' => 0,
+                'product' => null, // Product data if available, can be null if not set
+                'customPrice' => null, // Custom price if applicable, can be null if not set
+                'price' => 0, // product price or variation price
+                'priceInclTax' => 0, // Price including tax
+                'finalPrice' => 0, // price with option and bundle
+                'finalPriceInclTax' => 0, // price with option and bundle incl tax
+                'options' => '',
+                'bundles' => '',
+                'groupItems' => '',
+                'variations' => '',
+                'optionPrice' => 0, // Total price of options
+                'bundlePrice' => 0, // Total price of bundles
+                'groupItemPrice' => 0, // Total price of group items
+                'note' => '',
+                'qty' => 0,
+
+                'discounts' => array(),
+                'discount' => 0,
+                'discountTax' => 0,
+                'discountInclTax' => 0,
+
+                'discountRules' => null,
+                'discountRuleTotal' => 0, // Total discount rules amount, can be 0 if no rules applied
+                'discountRuleTax' => 0, // Total discount rules tax amount, can be 0 if no rules applied
+                'discountRuleInclTax' => 0, // Total discount rules amount including tax, can be 0 if no rules applied
+
+                'shipping' => 0,
+                'shippingTax' => 0,
+                'shippingInclTax' => 0,
+
+                'subtotal' => 0,
+                'subtotalInclTax' => 0,
+                'tax' => 0,
+                'taxDetails' => array(),
+
+                'total' => 0,
+                'totalInclTax' => 0,
+
+                'isShipping' => false,
+                'isSync' => false,
+                'createdAt' => 0,
+                'updatedAt' => 0,
+            );
+            return $item;
+        }
+        public function _formatApiOrder($order_id,$currency = null)
+        {
+            $formatted_order = $this->woo_class->formatWooOrder($order_id);
+            return $formatted_order;
+            // $currency_pos = wc_get_price_decimals(); 
+            // $decimal = isset($currency['decimal']) ? $currency['decimal'] : $currency_pos;
+            // $register = null;
+            // $outlet = null;
+            // $cashier = null;
+            // $seller = null;
+            // $order = array(
+            //     'id' => $formatted_order['id'], // Optional, for SQLite row id
+            //     'localId' => $formatted_order['order_id'], // Optional, for SQLite row id
+            //     'sessionId' => '',
+            //     'cartType' => '',
+            //     'cartSource' => '',
+            //     'cartSourceDetails' => '',
+            
+            //     'orderNumber' => $formatted_order['order_number'], // Order number, can be empty if not assigned
+            //     'orderId' => $formatted_order['order_id'], // Order ID, can be null if not assigned
+            //     'orderNumberFormatted' => $formatted_order['order_number_format'], // Formatted order number, can be empty if not assigned
+            
+            //     'label' => $formatted_order['title'],
+            //     'customerId' => 0,
+            //     'customer' => $formatted_order['customer'], // Customer|null
+            //     'seller' => $seller,   // User|null
+            //     'cashier' => $cashier,  // User|null
+            //     'register' => $register, // User|null
+            //     'outlet' => $outlet,   // User|null
+            
+            //     'coupons' => [],
+            //     'coupounTotal' => 0, // Total coupon amount, can be 0 if no coupons applied
+            //     'couponTax' => 0,    // Total coupon tax amount, can be 0 if no coupons applied
+            //     'couponInclTax' => 0, // Total coupon amount including tax, can be 0 if no coupons applied
+            
+            //     'discountRules' => null,
+            //     'discountRuleTotal' => 0, // Total discount rules amount, can be 0 if no rules applied
+            //     'discountRuleTax' => 0,   // Total discount rules tax amount, can be 0 if no rules applied
+            //     'discountRuleInclTax' => 0, // Total discount rules amount including tax, can be 0 if no rules applied
+            
+            //     'discounts' => '', // manual discount
+            //     'discount' => 0,
+            //     'discountTax' => 0,
+            //     'discountInclTax' => 0,
+            
+            //     'pickupDate' => '', // Optional, for pickup date if applicable
+            //     'pickupTime' => '', // Optional, for pickup time if applicable
+            //     'pickupLocation' => '', // Optional, for pickup location if applicable
+            //     'pickupNote' => '', // Optional, for pickup note if applicable
+            
+            //     'shipping' => '',
+            //     'shippingNote' => '',
+            //     'shippingCost' => 0,
+            //     'shippingTax' => 0,
+            //     'shippingTotal' => 0,
+            //     'shippingInclTax' => 0, // Total shipping cost including tax
+            
+            //     'subTotal' => 0,
+            //     'itemTax' => 0,
+            //     'subtotalInclTax' => 0,
+            
+            //     'feeTotal' => 0, // Total fee amount excl tax
+            //     'feeTax' => 0,   // Total fee tax amount
+            //     'feeInclTax' => 0, // Total fee amount including tax
+            
+            //     'taxDetails' => '',
+            //     'tax' => $this->_convertToCent($formatted_order['grand_total'],$decimal), // Total tax amount
+            //     'grandTotal' => $this->_convertToCent($formatted_order['tax_amount'],$decimal), // grand total with tax
+            
+            //     'state' => $formatted_order['state'], // Order state, can be 'pending', 'processing', 'completed', 'cancelled', etc.
+            //     'status' => $formatted_order['status'], // Order status, can be 'pending', 'processing', 'completed', 'cancelled', etc.
+            //     'totalPaid' => $this->_convertToCent($formatted_order['total_paid'],$decimal), // total paid amount
+            //     'paymentTransactions' => null, // Array of payment transactions, can be null if no transactions
+            
+            //     'isGift' => false,
+            //     'isShipping' => false,
+            //     'isSync' => true,
+            //     'isPaid' => false,
+            //     'isPrinted' => false,
+            //     'isSyncCart' => false,
+            
+            //     'feeItems' => array(), // Optional, for fee items if any
+            //     'items' => array(),     // You can replace 'any' with your CartItem[] interface if available
+            //     'currency' => null,
+            //     'note' => '', // Optional, for pickup note if applicable
+            
+            //     'additionalData' => $formatted_order['addition_information'], // Optional, for any additional data related to the order
+            
+            //     'createdAt' => 0,
+            //     'updatedAt' => 0,
+            // );
+            // return $order;
+        }
     }
 }

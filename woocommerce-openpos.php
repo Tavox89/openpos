@@ -5,7 +5,7 @@ Plugin URI: http://wpos.app
 Description: Quick POS system for woocommerce.
 Author: anhvnit@gmail.com
 Author URI: http://wpos.app/
-Version: 7.3.4
+Version: 7.3.7
 WC requires at least: 3.0
 WC tested up to: 9.9.5
 Text Domain: openpos

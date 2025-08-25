@@ -115,6 +115,8 @@ class Openpos_Core
             'order'                  => 'ASC',
             'hide_empty'             => false,
         );
+        
+
         $the_query = new WP_Term_Query($tax_args);
         $terms = $the_query->get_terms();
         $ignore_product_types = array();
@@ -146,9 +148,7 @@ class Openpos_Core
             'orderby' => 'date',
             'order' => 'DESC', 
             'include' => array(),
-            'exclude' => array(), 
-            'meta_key' => '',
-            'meta_value' =>'', 
+            'exclude' => array(),
             'post_type' => 'product',
             'suppress_filters' => true
         );
@@ -178,7 +178,20 @@ class Openpos_Core
                 'operator' => 'NOT IN',
             ),
         );
-       
+        $warehouse_id = isset($args['warehouse_id']) ? $args['warehouse_id'] : 0;
+
+        if($warehouse_id > 0)
+        {
+            $meta_key_hide_instore = '_hide_pos_website_'.$warehouse_id; 
+            $r['meta_query'] = array(
+                array(
+                    'key' => $meta_key_hide_instore,
+                    'value' => 'no',
+                    'compare' => '='
+                )
+            );
+        }
+
         if((isset($args['s']) && $args['s'] != '') || $display_variable )
         {
             
@@ -196,7 +209,7 @@ class Openpos_Core
 
             
         }else{
-            
+           
             $args = array(
                 'posts_per_page'   => $r['posts_per_page'],
                 'post_type'        => $this->getPosPostType(),
@@ -214,7 +227,10 @@ class Openpos_Core
                 
                 
             );
-            
+            if($warehouse_id > 0)
+            {
+                $args['meta_query'] = $r['meta_query'] ;;
+            }
 
             if ( ! empty($r['include']) ) {
                 $incposts = wp_parse_id_list( $r['include'] );
@@ -237,7 +253,7 @@ class Openpos_Core
                 }
             }
             $query_args = apply_filters('op_get_products_args',$args);
-            
+           
             $the_query = new WP_Query( $query_args );
            
             $posts = $the_query->get_posts();

@@ -97,6 +97,17 @@ if(!class_exists('OP_REST_API'))
             
             return rest_ensure_response( $result );
         }
+        public function _convertToCent($price,$decimal)
+        {
+            if(!$price)
+            {
+                return 0;
+            }
+            
+            $pow = pow(10,$decimal);
+            $number =  1 * $price* $pow ;
+            return floor($number);
+        }
         
 
     }
