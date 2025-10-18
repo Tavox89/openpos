@@ -720,11 +720,11 @@ class OP_Woo{
         foreach ( $variation_ids as $variation_id ) {
             $variation = wc_get_product( $variation_id );
             if ( ! $variation || ! $variation->exists()  ) {
-				continue;
+				//continue;
             }
             if($warehouse_id == 0 && ( $show_out_of_stock_setting != 'yes' && ! $variation->is_in_stock() ))
             {
-                continue;
+                //continue;
             }
 
 			//$_available_variations[] =  $tmp_class->get_available_variation( $variation );
@@ -741,7 +741,7 @@ class OP_Woo{
             $product_id = $v['variation_id'];
             if( !$op_warehouse->is_instore($warehouse_id,$v['variation_id']))
             {
-                continue;
+               // continue;
             }
             $current_qty = 1 * $op_warehouse->get_qty($warehouse_id,$product_id);
             $tmp_v['stock_quantity'] = $current_qty;
@@ -751,7 +751,7 @@ class OP_Woo{
         return $available_variations;
     }
 
-    public function get_variations($product_id,$warehouse_id = 0,$incl_tax = false){
+    public function get_variations($product_id,$warehouse_id = 0,$incl_tax = false,$currency = null){
         try{
             $cache_key = 'op_variations_product_cache_'.$warehouse_id.'_'.$product_id;
             $cache_group = 'products';
@@ -769,6 +769,21 @@ class OP_Woo{
                 {
                     return false;
                 }
+
+                if(!$currency || $currency == null)
+                {
+                    $currency_pos = get_option( 'woocommerce_currency_pos' );
+                    $currency  = array(
+                        'decimal' => wc_get_price_decimals(),
+                        'decimal_separator' => wc_get_price_decimal_separator(),
+                        'thousand_separator' => wc_get_price_thousand_separator(),
+                        'currency_pos' => $currency_pos,
+                        'code' => get_woocommerce_currency(), 
+                        'symbol' => html_entity_decode(get_woocommerce_currency_symbol()), 
+                        'rate' => 1
+                    );
+                }
+
                 $item_variations = $this->get_available_variations($variation,$warehouse_id);
                 $variant_products_with_attribute = array();
                 $variation_attributes   = $variation->get_variation_attributes();
@@ -778,6 +793,7 @@ class OP_Woo{
                 $variations = array();
                 $qty_list = array();
                 $child_products = array();
+                $child_keywords = array();
                 foreach($item_variations as $a_p)
                 {
                     $variation_id = $a_p['variation_id'];
@@ -791,7 +807,7 @@ class OP_Woo{
                     //$a_p_price =  wc_get_price_including_tax($variant_product);
                     $a_p_price =  $taxes['price_incl_tax'];
                     
-        
+                    $child_keywords[] = $variant_product->get_name();
                     
                     //end update price
         
@@ -816,11 +832,11 @@ class OP_Woo{
                         'barcode' => $barcode,
                         'qty' => $qty,
                         'price_included_tax' => $this->_price_included_tax($variant_product,$warehouse_id),
-                        'final_price' => $taxes['price_excl_tax'],
-                        'final_price_incl_tax' => $taxes['price_incl_tax'],
-                        'regular_price_with_tax' => $taxes['regular_price_with_tax'],
-                        'regular_price_excl_tax' => $taxes['regular_price_excl_tax'],
-                        'tax_amount' => $taxes['tax_amount'],
+                        'final_price' => $this->_core->rounding_price($taxes['price_excl_tax'],$currency['decimal']),
+                        'final_price_incl_tax' => $this->_core->rounding_price($taxes['price_incl_tax'],$currency['decimal']),
+                        'regular_price_with_tax' => $this->_core->rounding_price($taxes['regular_price_with_tax'],$currency['decimal']),
+                        'regular_price_excl_tax' => $this->_core->rounding_price($taxes['regular_price_excl_tax'],$currency['decimal']),
+                        'tax_amount' => $this->_core->rounding_price($taxes['tax_amount'],$currency['decimal']),
                         'manage_stock' => $this->_manage_stock($variant_product,$warehouse_id),
                     );
         
@@ -996,7 +1012,8 @@ class OP_Woo{
                     'variations' => $variations,
                     'price_list' => $price_list,
                     'regular_price_list' => $regular_price_list,
-                    'qty_list' => $qty_list
+                    'qty_list' => $qty_list,
+                    'child_keywords' => array_unique($child_keywords)
                 );
                 wp_cache_set( $cache_key, $result, $cache_group );
             }
@@ -1285,7 +1302,7 @@ class OP_Woo{
         return $data;
     }
     
-    public function get_product_formatted_data($_product,$warehouse_id = 0,$ignore_variable = false,$is_search = false){
+    public function get_product_formatted_data($_product,$warehouse_id = 0,$ignore_variable = false,$is_search = false,$currency = null){
         global $op_warehouse;
         global $op_session_data;
         
@@ -1299,59 +1316,45 @@ class OP_Woo{
 
         $cache_key = 'op_product_cache_'.$warehouse_id.'_'.$product_id;
         $cache_group = 'products';
-
+        $show_out_of_stock_setting = $this->settings_api->get_option('pos_display_outofstock','openpos_pos');
         $cached_data = wp_cache_get( $cache_key, $cache_group );
+        $parent_product = null;
+        $product_variation = null;
+        if(!$currency || $currency == null)
+        {
+            $currency_pos = get_option( 'woocommerce_currency_pos' );
+            $currency  = array(
+                'decimal' => wc_get_price_decimals(),
+                'decimal_separator' => wc_get_price_decimal_separator(),
+                'thousand_separator' => wc_get_price_thousand_separator(),
+                'currency_pos' => $currency_pos,
+                'code' => get_woocommerce_currency(), 
+                'symbol' => html_entity_decode(get_woocommerce_currency_symbol()), 
+                'rate' => 1
+            );
+        }
+        $openpos_type = $this->settings_api->get_option('openpos_type','openpos_pos');
+        $setting_tax_class =  apply_filters('get_product_formatted_data:pos_tax_class', $this->settings_api->get_option('pos_tax_class','openpos_general'),$_product,$warehouse_id );
+        $display_price_with_tax =  apply_filters('pos_display_price_with_tax',('incl' === get_option('woocommerce_tax_display_shop')) ? true : false,$product,$warehouse_id);;
+        //$type = $product->get_type();
+        $product_type = $product->get_type();
+        $post_type = get_post_type($product->get_id());    
+        $lang = $this->settings_api->get_option('pos_language','openpos_pos');
+        $child_products = array();
+        $price_display_html = $product->get_price_html();
+        $v_price_display_html = '';
+        $group = array();
+        $options = array();
+        $bundles = array();
+        $variations = array();
+        $child_product_keywords = array();
 
-		if ( false !== $cached_data ) {
+		if ( false !== $cached_data  ) {
             $tmp = $cached_data;
-            $qty = $product->get_stock_quantity();
-            $stock_status = $product->get_stock_status('edit');
-            $manage_stock = $this->_manage_stock($product,$warehouse_id);
-            if($warehouse_id > 0  )
-            {
-                //$manage_stock = true;
-                $wqty =  $op_warehouse->get_qty($warehouse_id,$product_id);
-                if(!$wqty)
-                {
-                 $wqty = 0;
-                }
-                $qty = 1 *  $wqty;
-                if($manage_stock)
-                {
-                    $stock_status = ($qty > 0) ? 'instock' : 'outofstock';
-                }
-               
-                if($qty == '' || $qty == null)
-                {
-                    $qty = 0;
-                }
-                
-
-            }
-            
-            
-
-            $tmp['qty'] = $qty;
-            $tmp['stock_status'] = $stock_status;
 		}else{
-            $parent_product = null;
-            $product_variation = null;
             
-            $setting_tax_class =  apply_filters('get_product_formatted_data:pos_tax_class', $this->settings_api->get_option('pos_tax_class','openpos_general'),$_product,$warehouse_id );
-            
-            
-            $lang = $this->settings_api->get_option('pos_language','openpos_pos');
-            $options = array();
-            $bundles = array();
-            $variations = array();
-    
-    
-           
-    
-            $type = $product->get_type();
-            $post_type = get_post_type($product->get_id());
             $is_orphaned = $this->is_orphaned($product);
-            if($type == 'grouped')
+            if($product_type == 'grouped')
             {
                 return false;
             }
@@ -1359,7 +1362,6 @@ class OP_Woo{
             {
                 return false;
             }
-
             $image =  wc_placeholder_img_src() ;
             if ( has_post_thumbnail( $product->get_id() ) ) {
                 $attachment_id =  get_post_thumbnail_id( $product->get_id() );
@@ -1377,234 +1379,20 @@ class OP_Woo{
                     $image = $image_attr[0];
                 }
             }
-            $qty = $product->get_stock_quantity();
+            
             $manage_stock = $this->_manage_stock($product,$warehouse_id);
-            $stock_status = $product->get_stock_status('edit');
-            $product_id = $product->get_id();
-    
-            //end
-    
-            if($warehouse_id > 0  )
-            {
-                
-                $wqty =  $op_warehouse->get_qty($warehouse_id,$product_id);
-                if(!$wqty)
-                {
-                 $wqty = 0;
-                }
-                $qty = 1 *  $wqty;
-                
-            }
-    
-            $group = array();
-            $child_products = array();
-    
-            $price_display_html = $product->get_price_html();
-            
-            $v_price_display_html = '';
-
-            $display_price_with_tax =  apply_filters('pos_display_price_with_tax',('incl' === get_option('woocommerce_tax_display_shop')) ? true : false,$product,$warehouse_id);;
-            
-            
-            if(!$ignore_variable)
-            {
-                switch ($type)
-                {
-    
-                    case 'grouped':
-                        $group = $product->get_children();
-                        break;
-                    case 'variable':
-                        if($post_type == 'product')
-                        {
-                            if($is_search)
-                            {
-                                $child_ids = $product->get_children();
-                                //$_parent_product = $this->get_parent_product_formatted_data($product,$warehouse_id ,true,$is_search);
-                                foreach($child_ids as $cid)
-                                {   
-                                    $child_product_pos = get_post($cid);
-                                    $child_product_data = $this->get_product_formatted_data($child_product_pos,$warehouse_id,true);
-                                    $child_name = $product->get_name();
-                                    $attribute_label = wc_get_formatted_variation( $child_product_pos, true, false );
-                                    if($attribute_label)
-                                    {
-                                        $child_name.= ' ';
-                                        $child_name.= $attribute_label;
-                                    }
-                                    $child_product_data['name'] = $child_name;
-                                    if(isset($child_product_data['barcode']))
-                                    {
-                                        $cbarcode = $child_product_data['barcode'];
-                                        $child_products[$cbarcode] = $child_product_data;
-                                    }
-                                }
-                            }
-                            
-                            $variations_result = $this->get_variations($product->get_id(),$warehouse_id,$display_price_with_tax);
-                            
-                            $variations = $variations_result ?  $variations_result['variations'] : array();
-                            $price_list = $variations_result ?  $variations_result['price_list'] : array();
-                            $regular_price_list = $variations_result ? $variations_result['regular_price_list'] : array();
-                            $qty_list = $variations_result ? $variations_result['qty_list'] : array();
-                            $stock_manager = $product->get_manage_stock();
-                            $qty = 0;
-                            if($stock_manager)
-                            {
-                                foreach($qty_list as $_qty)
-                                {
-                                    if($_qty > 0)
-                                    {
-                                        $qty += 1 * $_qty;
-                                    }
-                                }
-                            }
-                            
-                            
-                            
-                           
-                            if(!empty($price_list))
-                            {
-                                $price_list_min = min($price_list);
-                                $price_list_max = max($price_list);
-    
-    
-                                if($price_list_min != $price_list_max)
-                                {
-                                    $price_list_min = wc_price($price_list_min);
-                                    $price_list_max = wc_price($price_list_max);
-                                    $v_price_display_html = wc_format_price_range($price_list_min,$price_list_max);
-                                }else{
-
-                                    $v_price_display_html = wc_price($price_list_min);
-                                    if(!empty($regular_price_list))
-                                    {
-                                        $regular_max = max($regular_price_list);
-                                        if($price_list_min < $regular_max)
-                                        {
-                                            $v_price_display_html = wc_format_sale_price($regular_max,$price_list_min);
-                                        }
-                                    }
-                                }
-                            }
-    
-                        }
-                        break;
-                    default:
-                        if($setting_tax_class != 'op_productax')
-                        {
-                            $price_display_html = wc_price(wc_get_price_excluding_tax($product));
-                        }
-                        break;
-                }
-            }
-            if($price_display_html == null)
-            {
-                $price_display_html = $v_price_display_html;
-            }
             $price_included_tax = $this->_price_included_tax($product,$warehouse_id);
-            $taxes = $this->_tax($product,$warehouse_id);
+            //end
             
-            $tax_amount = $taxes['tax_amount'];
-            $has_regular_price = $taxes['has_regular_price'];
-
-            $price_without_tax = $taxes['price_excl_tax'];
-            $price_incl_tax = $taxes['price_incl_tax'];
-
-            $regular_price_without_tax = $taxes['regular_price_excl_tax'];
-            $regular_price_with_tax = $taxes['regular_price_with_tax'];
-            if(!$price_without_tax)
-            {
-                $price_without_tax = 0;
-            }
-            if(!$price_incl_tax)
-            {
-                $price_incl_tax = 0;
-            }
-            
-            if($type == 'variable')
-            {
-                $price_display_html = $v_price_display_html;
-            }else{
-
-                if($display_price_with_tax)
-                {
-                    $price_display_html = wc_price($price_incl_tax);
-                    if( wc_price($price_incl_tax) !=  wc_price($regular_price_with_tax) && (float)$regular_price_with_tax > 0)
-                    {
-                        
-                        $price_display_html = wc_format_sale_price($regular_price_with_tax,$price_incl_tax);
-                    }
-                    
-                }else{
-                    $price_display_html = wc_price($price_without_tax);
-                    if( wc_format_decimal($price_without_tax) !=  wc_format_decimal($regular_price_without_tax) && (float)$regular_price_with_tax > 0)
-                    {
-                        $price_display_html = wc_format_sale_price($regular_price_without_tax,$price_without_tax);
-                    }
-                }
-            }
-            
-            
-
-            $price = 1 * floatval($price_without_tax);
-            $price_incl_tax = 1 * floatval($price_incl_tax);
-
-            if($has_regular_price)
-            {
-                $price = 1 * $regular_price_without_tax;
-                $price_incl_tax = 1 * $regular_price_with_tax;
-            }
-            $final_price = 1 * floatval($price_without_tax);
-
-            
-           
-            $display_pos = true;
-            if(get_post_type($product->get_id()) == 'product_variation')
-            {
-                $display_pos = false;
-            }
-            $show_out_of_stock_setting = $this->settings_api->get_option('pos_display_outofstock','openpos_pos');
-            
-            
-            if($warehouse_id > 0 && $manage_stock)
-            {
-                $stock_status = ($qty > 0) ? 'instock' : 'outofstock';
-            }
-    
-            if($display_pos && $show_out_of_stock_setting != 'yes')
-            {
-                if($manage_stock)
-                {
-                    if($qty <= 0 )
-                    {
-                        $display_pos = false;
-                    }
-                }elseif($stock_status == 'outofstock'){
-                    $display_pos = false;
-                }
-            }
-            
-            $categories = $this->get_product_categories($product->get_id());
-            if(!$categories)
-            {
-                $categories = array();
-            }
-    
-    
-            if($price_display_html == 'null' || $price_display_html == null)
-            {
-                $price_display_html = ' ';
-            }
             $decimal_qty = $this->enable_decimal_qty($product) ? 'yes' : 'no';
     
             $allow_decal = $this->enable_print_decal($product) ? 'yes' : 'no';
-            $type = '';
+            $unit_type = '';
             $type_unit = '';
             if( $tmp_type = $this->_is_weight_base_pricing($product->get_id()))
             {
               
-                $type = 'weight_base';
+                $unit_type = 'weight_base';
                 if($tmp_type == 'weight_base'){
                     $type_unit    = get_option( 'woocommerce_weight_unit' );
                     $decimal_qty = 'yes';
@@ -1614,143 +1402,73 @@ class OP_Woo{
                     $decimal_qty = 'yes';
                 }
             }else{
-                if( $tmp_type = $this->_is_price_base_pricing($product->get_id()))
+                if( $tmp_type = $this->_is_price_base_pricing($product_id))
                 {
-                    $type = 'price_base';
+                    $unit_type = 'price_base';
                     $decimal_qty = 'yes';
                 }
             }
-            
-            
-            $product_id = $product->get_id();
-            $parent_id = $product_id;
             $barcode = strtolower(trim($this->_core->getBarcode($product_id)));
-            if($tmp_parent_id = wp_get_post_parent_id($product_id))
-            {
-                if($tmp_parent_id != $parent_id)
-                {
-                    
-                    $parent_id = $tmp_parent_id ;
-                    $parent_post = get_post($parent_id);
-                    if($parent_post && $parent_post->post_type == 'product' && $post_type == 'product_variation')
-                    {
-                        $parent_product = $this->get_parent_product_formatted_data($parent_post,$warehouse_id ,true,$is_search);
-                        
-                        if(!empty($parent_product['variations']))
-                        {
-                            $product_variation_options = array();
-                            $product_variation_value_label = array();
-                            foreach($parent_product['variations'] as $v)
-                            {
-                                $slug = $v['slug'];
-                                $title = $v['title'];
-                                $value = array(''.$barcode);
-                                $value_label = $product->get_attribute( $slug );
-    
-                                foreach($v['options'] as $o)
-                                {
-                                    if(sanitize_title($value_label) == sanitize_title($o['title']))
-                                    {
-                                        $value = $o['values'];
-                                    }
-                                }
-    
-                                $product_variation_options[$slug] = array(
-                                    'title' => $title,
-                                    'slug' => $slug,
-                                    'value' => $value,
-                                    'value_label' => $value_label,
-                                );
-                                $product_variation_value_label[$slug] = $value_label;
-                            }
-    
-                            $product_variation = array(
-                                'options' => $product_variation_options,
-                                'value' => ''.$barcode,
-                                'price' => $final_price,
-                                'value_label' => $product_variation_value_label,
-                            );
-                        }
-                    }
-                    
-                    
-                }
-                
-            }
-            
-            if($qty == '' || $qty == null)
-            {
-                $qty = 0;
-            }
             $custom_notes = $this->getProductCustomNotes($product_id);
             
-            if($price_display_html)
+            $categories = $this->get_product_categories($product_id);
+            if(!$categories)
             {
-                $price_takeaway_html = $product->get_price_html();
-                $price_table_html = $product->get_price_html();
-            }else{
-                $price_takeaway_html = wc_price($final_price);
-                $price_table_html = wc_price($final_price);
+                $categories = array();
             }
-            $product_type = $product->get_type();
+            
+            $parent_id = wp_get_post_parent_id($product_id);
             
             $tmp = array(
                 'name' => $product->get_name(),
                 'id' => $product_id,
                 'parent_id' => $parent_id,
                 'sku' => $product->get_sku(),
-                'qty' => $qty,
+                //qty' => $qty,
                 'manage_stock' => $manage_stock,
-                'stock_status' => $stock_status,
+               // 'stock_status' => $stock_status,
                 'barcode' => $barcode,
                 'image' => $image,
-                'price' => $price,
-                'price_incl_tax' => $price_incl_tax,
-                'final_price' => $final_price,
-                'special_price' => $product->get_sale_price() ? 1 *floatval($product->get_sale_price()) : $product->get_sale_price(),
-                'regular_price' =>  $product->get_regular_price() ? 1 * floatval($product->get_regular_price()) : $product->get_regular_price(),
+                //'price' =>  $this->_core->rounding_price($price,$currency['decimal']),
+               // 'price_incl_tax' => $this->_core->rounding_price($price_incl_tax,$currency['decimal']),
+               // 'final_price' =>  $this->_core->rounding_price($final_price,$currency['decimal']),
+                'special_price' => $product->get_sale_price() ?  $this->_core->rounding_price(1 *floatval($product->get_sale_price()),$currency['decimal']) :  $this->_core->rounding_price($product->get_sale_price(),$currency['decimal']),
+                'regular_price' =>  $product->get_regular_price() ?  $this->_core->rounding_price(1 * floatval($product->get_regular_price()),$currency['decimal']) :  $this->_core->rounding_price($product->get_regular_price(),$currency['decimal']),
                 'sale_from' => $product->get_date_on_sale_from(),
                 'sale_to' => $product->get_date_on_sale_to(),
                 'status' => $product->get_status(),
                 'categories' => array_unique($categories),//$product->get_category_ids(),
-                'tax' => $taxes['taxes'],
-                'tax_amount' => 1 * $taxes['tax_amount'],
+               // 'tax' => $taxes['taxes'],
+               // 'tax_amount' =>  $this->_core->rounding_price(1 * $taxes['tax_amount'],$currency['decimal']),
                 'price_included_tax' => 1 * $price_included_tax,
-                'group_items' => $group,
-                'variations' => $variations,
-                'options' => $options,
-                'bundles' => $bundles,
+                // 'group_items' => $group,
+                // 'variations' => $variations,
+                // 'options' => $options,
+                // 'bundles' => $bundles,
                 'display_special_price' => false,
                 'allow_change_price' => false,
-                'price_display_html' => $price_display_html,
-                'price_takeaway_html' => $price_takeaway_html,
-                'price_table_html' => $price_table_html,
-                'display' => $display_pos,
+                //'price_display_html' => $price_display_html,
+                //'display' => $display_pos,
                 'product_type' => $product_type,
-                'type' => $type,
+                'type' => $unit_type,
                 'decimal_qty' => $decimal_qty,
                 'custom_notes' => $custom_notes,
                 'allow_decal' => $allow_decal,
-                'product_variation' => $product_variation,
-                'parent_product' => $parent_product
+                //'product_variation' => $product_variation,
+                //'parent_product' => $parent_product,
+                //'version' => $db_version
             );
             
-            
-            
-            if($type)
+            if($unit_type)
             {
                 $tmp['type_unit'] = $type_unit;
             }
-            if(!empty($child_products ))
-            {
-                $tmp['child_products'] = $child_products ;
-            }
             
-    
             if($lang == 'vi' || !isset( $tmp['search_keyword']))
             {
                 $tmp['search_keyword'] = $this->custom_vnsearch_slug($tmp['name']);
             }
+
             
             if($this->settings_api->get_option('pos_change_price','openpos_pos') == 'yes')
             {
@@ -1766,9 +1484,310 @@ class OP_Woo{
             wp_cache_set( $cache_key, $tmp, $cache_group );
         
         }
+        $manage_stock = isset($tmp['manage_stock']) ? $tmp['manage_stock'] : $this->_manage_stock($product,$warehouse_id);
+        $parent_id = isset($tmp['parent_id']) ? $tmp['parent_id'] : wp_get_post_parent_id($product_id);
+        if($product_type == 'grouped' && !$ignore_variable)
+        {
+            $group = $product->get_children();
+        }
+        $qty = $product->get_stock_quantity();
+        $stock_status = $product->get_stock_status('edit');
+        if($warehouse_id > 0  )
+        {
+            $wqty =  $op_warehouse->get_qty($warehouse_id,$product_id);
+            if(!$wqty)
+            {
+                $wqty = 0;
+            }
+            $qty = 1 *  $wqty;
+        }
+
+
+        if(!$ignore_variable)
+        {
+            switch ($product_type)
+            {
+
+                case 'grouped':
+                    $group = $product->get_children();
+                    break;
+                case 'variable':
+                    if($post_type == 'product')
+                    {
+                        if($is_search)
+                        {
+                            $child_ids = $product->get_children();
+                            //$_parent_product = $this->get_parent_product_formatted_data($product,$warehouse_id ,true,$is_search);
+                            foreach($child_ids as $cid)
+                            {   
+                                $child_product_pos = get_post($cid);
+                                $child_product_data = $this->get_product_formatted_data($child_product_pos,$warehouse_id,true);
+                                $child_name = $product->get_name();
+                                $attribute_label = wc_get_formatted_variation( $child_product_pos, true, false );
+                                if($attribute_label)
+                                {
+                                    $child_name.= ' ';
+                                    $child_name.= $attribute_label;
+                                }
+                                $child_product_data['name'] = $child_name;
+                                if(isset($child_product_data['barcode']))
+                                {
+                                    $cbarcode = $child_product_data['barcode'];
+                                    $child_products[$cbarcode] = $child_product_data;
+                                }
+                            }
+                        }
+                        
+                        $variations_result = $this->get_variations($product->get_id(),$warehouse_id,$display_price_with_tax,$currency);
+                        
+                        $child_product_keywords  = $variations_result ?  $variations_result['child_keywords'] : array();
+                        $variations = $variations_result ?  $variations_result['variations'] : array();
+                        $price_list = $variations_result ?  $variations_result['price_list'] : array();
+                        $regular_price_list = $variations_result ? $variations_result['regular_price_list'] : array();
+                        $qty_list = $variations_result ? $variations_result['qty_list'] : array();
+                        $stock_manager = $product->get_manage_stock();
+                        $qty = 0;
+                        if($stock_manager)
+                        {
+                            foreach($qty_list as $_qty)
+                            {
+                                if($_qty > 0)
+                                {
+                                    $qty += 1 * $_qty;
+                                }
+                            }
+                        }
+                        if(!empty($price_list))
+                        {
+                            $price_list_min = min($price_list);
+                            $price_list_max = max($price_list);
+
+
+                            if($price_list_min != $price_list_max)
+                            {
+                                $price_list_min = wc_price($price_list_min);
+                                $price_list_max = wc_price($price_list_max);
+                                $v_price_display_html = wc_format_price_range($price_list_min,$price_list_max);
+                            }else{
+
+                                $v_price_display_html = wc_price($price_list_min);
+                                if(!empty($regular_price_list))
+                                {
+                                    $regular_max = max($regular_price_list);
+                                    if($price_list_min < $regular_max)
+                                    {
+                                        $v_price_display_html = wc_format_sale_price($regular_max,$price_list_min);
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                    break;
+                default:
+                    if($setting_tax_class != 'op_productax')
+                    {
+                        $price_display_html = wc_price(wc_get_price_excluding_tax($product));
+                    }
+                    break;
+            }
+        }
+        if($price_display_html == null)
+        {
+            $price_display_html = $v_price_display_html;
+        }
         
+        $taxes = $this->_tax($product,$warehouse_id);
+        
+        $tax_amount = $taxes['tax_amount'];
+        $has_regular_price = $taxes['has_regular_price'];
+
+        $price_without_tax = $taxes['price_excl_tax'];
+        $price_incl_tax = $taxes['price_incl_tax'];
+
+        $regular_price_without_tax = $taxes['regular_price_excl_tax'];
+        $regular_price_with_tax = $taxes['regular_price_with_tax'];
+        if(!$price_without_tax)
+        {
+            $price_without_tax = 0;
+        }
+        if(!$price_incl_tax)
+        {
+            $price_incl_tax = 0;
+        }
+        
+        if($product_type == 'variable')
+        {
+            $price_display_html = $v_price_display_html;
+        }else{
+
+            if($display_price_with_tax)
+            {
+                $price_display_html = wc_price($price_incl_tax);
+                if( wc_price($price_incl_tax) !=  wc_price($regular_price_with_tax) && (float)$regular_price_with_tax > 0)
+                {
+                    
+                    $price_display_html = wc_format_sale_price($regular_price_with_tax,$price_incl_tax);
+                }
+            }else{
+                $price_display_html = wc_price($price_without_tax);
+                if( wc_format_decimal($price_without_tax) !=  wc_format_decimal($regular_price_without_tax) && (float)$regular_price_with_tax > 0)
+                {
+                    $price_display_html = wc_format_sale_price($regular_price_without_tax,$price_without_tax);
+                }
+            }
+        }
+        
+        
+
+        $price = 1 * floatval($price_without_tax);
+        $price_incl_tax = 1 * floatval($price_incl_tax);
+
+        if($has_regular_price)
+        {
+            $price = 1 * $regular_price_without_tax;
+            $price_incl_tax = 1 * $regular_price_with_tax;
+        }
+        $final_price = 1 * floatval($price_without_tax);
+
+        
+       
+        $display_pos = true;
+        if($post_type== 'product_variation')
+        {
+            $display_pos = false;
+        }
+        
+        
+        
+        if($warehouse_id > 0 && $manage_stock)
+        {
+            $stock_status = ($qty > 0) ? 'instock' : 'outofstock';
+        }
+
+        if($display_pos && $show_out_of_stock_setting != 'yes')
+        {
+            if($manage_stock)
+            {
+                if($qty <= 0 )
+                {
+                    $display_pos = false;
+                }
+            }elseif($stock_status == 'outofstock'){
+                $display_pos = false;
+            }
+        }
+        
+        
+
+        if($price_display_html == 'null' || $price_display_html == null)
+        {
+            $price_display_html = ' ';
+        }
+        
+        if($product_id != $parent_id)
+        {
+            $parent_post = get_post($parent_id);
+            if($parent_post && $parent_post->post_type == 'product' && $post_type == 'product_variation')
+            {
+                $parent_product = $this->get_parent_product_formatted_data($parent_post,$warehouse_id ,true,$is_search);
+                
+                if(!empty($parent_product['variations']))
+                {
+                    $product_variation_options = array();
+                    $product_variation_value_label = array();
+                    foreach($parent_product['variations'] as $v)
+                    {
+                        $slug = $v['slug'];
+                        $title = $v['title'];
+                        $value = array(''.$barcode);
+                        $value_label = $product->get_attribute( $slug );
+
+                        foreach($v['options'] as $o)
+                        {
+                            if(sanitize_title($value_label) == sanitize_title($o['title']))
+                            {
+                                $value = $o['values'];
+                            }
+                        }
+
+                        $product_variation_options[$slug] = array(
+                            'title' => $title,
+                            'slug' => $slug,
+                            'value' => $value,
+                            'value_label' => $value_label,
+                        );
+                        $product_variation_value_label[$slug] = $value_label;
+                    }
+
+                    $product_variation = array(
+                        'options' => $product_variation_options,
+                        'value' => ''.$barcode,
+                        'price' => $final_price,
+                        'value_label' => $product_variation_value_label,
+                    );
+                }
+                $tmp['parent_product'] = $parent_product;
+            }
+            
+            
+        }
+        if($qty == '' || $qty == null)
+        {
+            $qty = 0;
+        }
+
+        if($openpos_type == 'restaurant')
+        {
+            if($price_display_html)
+            {
+                $price_takeaway_html = $price_display_html;
+                $price_table_html = $price_display_html;
+            }else{
+                $price_takeaway_html = wc_price($final_price);
+                $price_table_html = wc_price($final_price);
+            }
+            $tmp['price_takeaway_html'] = $price_takeaway_html;
+            $tmp['price_table_html'] = $price_table_html;
+        }
+        $tmp['qty'] = $qty;
+        $tmp['display'] = $display_pos;
+        $tmp['stock_status'] = $stock_status;
+        $tmp['price'] = $this->_core->rounding_price($price,$currency['decimal']);
+        $tmp['price_incl_tax'] = $this->_core->rounding_price($price_incl_tax,$currency['decimal']);
+        $tmp['final_price'] = $this->_core->rounding_price($final_price,$currency['decimal']);
+        $tmp['tax'] = $taxes['taxes'];
+        $tmp['tax_amount'] =  $this->_core->rounding_price(1 * $tax_amount,$currency['decimal']);
+        
+        $tmp['price_display_html'] = $price_display_html;
+        $tmp['product_variation'] = $product_variation;
+        
+
+        $tmp['group_items'] = $group;
+        $tmp['variations'] = $variations;
+        $tmp['options'] = $options;
+        $tmp['bundles'] = $bundles;
+
+
+        if(!empty($child_products ))
+        {
+            $tmp['child_products'] = $child_products ;
+        }
+
+        $meta_key = '_openpos_product_version_'.$warehouse_id;
+        $db_version =  get_post_meta( $product_id, $meta_key, true );
+        if(!$db_version)
+        {
+            $db_version = 0;
+        }
+
+        $tmp['version'] = $db_version;
+        $tmp['search_keyword'] .= ' '.implode(' ',array_unique($child_product_keywords));
+            
+       
         $product_data = apply_filters('op_product_data',$tmp,$_product,$warehouse_id);
         
+       
         return $product_data;
 
     }
@@ -1783,6 +1802,9 @@ class OP_Woo{
 
         if ( false !== $cached_data )
         {
+            $tmp_v = $this->get_variations($product_id,$warehouse_id);
+            $variations = $tmp_v && isset($tmp_v['variations']) ? $tmp_v['variations'] : array();
+            $cached_data['variations'] = $variations;
             $data = $cached_data;
         }else{
             $tmp_v = $this->get_variations($product_id,$warehouse_id);
@@ -2470,7 +2492,7 @@ class OP_Woo{
         }
 
     }
-    public function getProductChanged($local_ver,$warehouse_id = 0){
+    public function getProductChanged($local_ver,$warehouse_id = 0,$page = 1,$per_page = 30){
         global $wpdb;
         global $op_warehouse;
         $meta_key = '_openpos_product_version_'.$warehouse_id;
@@ -2478,21 +2500,23 @@ class OP_Woo{
         {
             $local_ver = 0;
         }
-        $sql = "SELECT * FROM {$wpdb->postmeta} WHERE meta_key = '".$meta_key."' AND meta_value >".($local_ver - 1)." ORDER BY meta_value ASC LIMIT 0,30";
-        
-        $rows = $wpdb->get_results(  $sql, ARRAY_A);
+        $from = ($page - 1) * $per_page;
+        $sql = "SELECT SQL_CALC_FOUND_ROWS {$wpdb->postmeta}.post_id,{$wpdb->postmeta}.meta_value FROM {$wpdb->postmeta} WHERE meta_key = '".$meta_key."' AND meta_value >".($local_ver - 1)." ORDER BY meta_value ASC LIMIT  %d,".$per_page;
+        $final_sql = $wpdb->prepare( $sql,$from);
+        $rows = $wpdb->get_results(  $final_sql, ARRAY_A);
 
         $result = array(
                 'current_version' => $local_ver,
-                'data' => array()
+                'data' => array(),
+                'found_posts' => 0
         );
         $db_version = get_option('_openpos_product_version_'.$warehouse_id,0);
-
-        if(count($rows) == 0)
+        $found_posts = (int) $wpdb->get_var( $wpdb->prepare("SELECT FOUND_ROWS()") );
+        if($found_posts  < $per_page )
         {
-
             $result['current_version'] = $db_version;
         }
+        $result['found_posts'] = $found_posts;
         foreach ($rows as $row)
         {
             $product_id = $row['post_id'];
@@ -2502,7 +2526,6 @@ class OP_Woo{
             {
                 $result['current_version'] = $product_verion;
             }
-           
             $barcode = $product_id; //$this->_core->getBarcode($product_id);
             $result['data'][$barcode] = $qty;
         }
@@ -5379,36 +5402,11 @@ class OP_Woo{
     }
    
     public function clear_product_cache($product_ids = array()){
-        global $op_warehouse;
-        //remove cache
-        $cache_group = 'products';
-        $warehouses = $op_warehouse->warehouses();
-        foreach($warehouses as $w)
-        {
-            $warehouse_id = isset($w['id']) ? $w['id'] : 0;
-            foreach($product_ids as $pid)
-            {
-                $cache_keys[] = 'op_product_cache_'.$warehouse_id.'_'.$pid;
-                $cache_keys[] = 'op_parent_product_cache_'.$warehouse_id.'_'.$pid;
-                $cache_keys[] = 'op_tax_product_cache_'.$warehouse_id.'_'.$pid;
-                $cache_keys[] = 'op_variations_product_cache_'.$warehouse_id.'_'.$pid;
-                foreach($cache_keys as $cache_key)
-                {
-                    wp_cache_delete($cache_key, $cache_group );
-                }
-                
-            }
-        }
+       $this->_core->clear_product_cache($product_ids);
         //end
     }
     public function clear_all_product_cache(){
-        $cache_group = 'products';
-        $result = wp_cache_flush_group( $cache_group );
-        if(!$result)
-        {
-            return $result;
-        }
-        return __('Clear OpenPOS Product cache success','openpos');
+        return $this->_core->clear_all_product_cache();
     }
     public function getTaxDetails($tax_class,$rate_id = 0){
         
@@ -5443,6 +5441,7 @@ class OP_Woo{
     public function _formatSetting($setting)
     {
         global $op_woo;
+        $setting['pos_search_display_product'] = 'yes';
         $setting['pos_money'] = $this->_core->_formatCash($setting['pos_money']);
         $setting['pos_custom_cart_discount_amount'] = $this->_core->_formatDiscountAmount($setting['pos_custom_cart_discount_amount']);
         $setting['pos_custom_item_discount_amount'] = $this->_core->_formatDiscountAmount($setting['pos_custom_item_discount_amount']);

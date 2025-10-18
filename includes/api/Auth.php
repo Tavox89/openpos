@@ -50,6 +50,12 @@ if(!class_exists('OP_REST_API_Auth'))
                     'permission_callback' => array($this,'permission_callback'),
                     ) 
                 );
+                register_rest_route( $this->namespace, '/pos-info', array(
+                    'methods' => WP_REST_Server::READABLE,
+                    'callback' => array($this,'pos_info'),
+                    'permission_callback' => '__return_true',
+                    ) 
+                );
         }
         private function _getAllSetting($warehouse_id,$cashdrawer_id = 0){
             $setting_sections = array(
@@ -180,6 +186,7 @@ if(!class_exists('OP_REST_API_Auth'))
             }
             $setting['pos_allow_online_payment'] = $this->core_class->allow_online_payment(); // yes or no
 
+            
             $setting['openpos_tables'] = array();
             $setting['payment_methods'] = $this->core_class->formatPaymentMethods($setting['payment_methods']);
 
@@ -208,6 +215,10 @@ if(!class_exists('OP_REST_API_Auth'))
             );
             
             try{
+                if(!$this->rest_api_limit())
+                {
+                    throw new Exception( __('Your have reach to maximum api request limit. Please try again later.','openpos' ));
+                }
                 $username = $request->get_param( 'username' );
                 $password = $request->get_param( 'password' );
                 $login_mode = $request->get_param( 'login_mode' );
@@ -388,6 +399,19 @@ if(!class_exists('OP_REST_API_Auth'))
                 $session_data['categories'] = $this->woo_class->get_pos_categories($cashdrawer_id);
                 $session_data['currency_decimal'] = wc_get_price_decimals() ;
 
+                $currency_pos = get_option( 'woocommerce_currency_pos' );
+                $default_currency  = array(
+                    'decimal' => wc_get_price_decimals(),
+                    'decimal_separator' => wc_get_price_decimal_separator(),
+                    'thousand_separator' => wc_get_price_thousand_separator(),
+                    'currency_pos' => $currency_pos,
+                    'code' => get_woocommerce_currency(), 
+                    'symbol' => html_entity_decode(get_woocommerce_currency_symbol()), 
+                    'rate' => 1
+                );
+                $session_data['currency'] = $default_currency;
+                $availble_currencies[$default_currency['code']] = $default_currency;
+
                 $session_data['time_frequency'] = $this->setting_class->get_option('time_frequency','openpos_pos') ? (int)$this->setting_class->get_option('time_frequency','openpos_pos') : 3000 ;
                 $session_data['product_sync'] = true;
                 $session_data['date_format'] = $this->core_class->convert_to_js_date_format(get_option( 'date_format' ));
@@ -480,6 +504,7 @@ if(!class_exists('OP_REST_API_Auth'))
                         $setting['pos_default_checkout_mode'] = 'multi';
                         $setting['pos_disable_item_discount'] = 'yes';
                         $setting['pos_disable_cart_discount'] = 'yes';
+                        $setting['pos_cart_tab'] = 'no'; // disable multi tab login for customer mode and waiter mode
                         $setting['pos_cart_buttons'] = array(
                             'cart-note',
                             // 'shipping',
@@ -497,18 +522,7 @@ if(!class_exists('OP_REST_API_Auth'))
                 // do_mark_item_done : mark item done on desk
                 $session_data['role'] = $roles;
                 //end role
-                $currency_pos = get_option( 'woocommerce_currency_pos' );
-                $default_currency  = array(
-                    'decimal' => wc_get_price_decimals(),
-                    'decimal_separator' => wc_get_price_decimal_separator(),
-                    'thousand_separator' => wc_get_price_thousand_separator(),
-                    'currency_pos' => $currency_pos,
-                    'code' => get_woocommerce_currency(), 
-                    'symbol' => html_entity_decode(get_woocommerce_currency_symbol()), 
-                    'rate' => 1
-                );
-                $setting['currency'] = $default_currency;
-                $availble_currencies[$default_currency['code']] = $default_currency;
+                
 
                 $setting['currencies'] = $availble_currencies;
                 //cart button
@@ -546,6 +560,8 @@ if(!class_exists('OP_REST_API_Auth'))
                 {
                     $setting['pos_weight_barcode_prefix'] = '20';
                 }
+               
+                
 
                 $session_data['setting'] = $setting;
 
@@ -725,9 +741,10 @@ if(!class_exists('OP_REST_API_Auth'))
 
                 $this->order_class->reset_order_number($current_order_number);
                 $z_report_str =  $request->get_param( 'z_report' );
-                $z_report_data = $z_report_str ? json_decode(stripslashes($z_report_str),true): array();
+                $z_report_data = $z_report_str ? json_decode($z_report_str,true): array();
                 $session_data =  $this->session_data;
                 $result['response']['status']  = 1;
+                
                 if(!empty($z_report_data))
                 {
                     
@@ -789,7 +806,8 @@ if(!class_exists('OP_REST_API_Auth'))
                 {
                     $last_check = strtotime($session_data['logged_time']) * 1000;
                 }
-                $cart = $request->get_param('cart') ?  json_decode(stripslashes($request->get_param('cart')),true) : array();
+                $cart = $request->get_param('cart') ?  json_decode($request->get_param('cart'),true) : array();
+                
                 if( !empty($cart) ){
                     $this->register_class->update_bill_screen($session_data,$cart);
                 }
@@ -799,13 +817,13 @@ if(!class_exists('OP_REST_API_Auth'))
                 $desk_message = '';
                 if($this->setting_class->get_option('openpos_type','openpos_pos') == 'restaurant' )
                 {
-                    $tables = $request->get_param('tables') ? $request->get_param('tables') : '';
+                    $tables = $request->get_param('tables') ? json_decode($request->get_param('tables'),true) : array();
                     
-                    if($tables)
+                    if(!empty($tables))
                     {
-                        $_tables = json_decode(stripslashes( $tables),true);
+                        
 
-                        foreach($_tables as $table_id => $table)
+                        foreach($tables as $table_id => $table)
                         {
                             $source_type = isset($table['source_type']) ? $table['source_type'] : '';
                             if($source_type == 'order_takeaway')
@@ -813,15 +831,8 @@ if(!class_exists('OP_REST_API_Auth'))
                                 //$tables[$table_id] = $table;
                             }
                         }
-                    }
-
-                    //save to table data
-                    //disable auto background save item on table
-                    if(!empty($tables))
-                    {
                         $this->table_class->update_bill_screen($tables,true);
                     }
-                    
 
                     $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                     
@@ -850,6 +861,34 @@ if(!class_exists('OP_REST_API_Auth'))
                     'ready_dish' => $ready_dish,
                     'desk_message' => $desk_message,
                     'notifications' => $notifications,
+                );
+                $result['response']['status'] = 1;
+                $result['code'] = 200;
+            }catch(Exception $e)
+            {
+                $result['code'] = 400;
+                $result['response']['status'] = 0;
+                $result['response']['message'] = $e->getMessage();
+                
+            }
+            return $this->rest_ensure_response($result);
+        }
+        public function pos_info(WP_REST_Request $request = null){
+            $result = array(
+                'code' =>'unknown_error',
+                'response' => array(
+                    'status' => 0,
+                    'data' => array(),
+                    'message' => ''
+                ),
+                'api_message' => ''
+            );
+            try{
+                $result['response']['data'] = array(
+                    'version' => $this->core_class->_op_version_number(),
+                    'type' => 'woocommerce-openpos',
+                    'woo_version' => WC()->version,
+                    'wp_version' => get_bloginfo( 'version' ),
                 );
                 $result['response']['status'] = 1;
                 $result['code'] = 200;

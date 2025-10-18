@@ -5,9 +5,9 @@ Plugin URI: http://wpos.app
 Description: Quick POS system for woocommerce.
 Author: anhvnit@gmail.com
 Author URI: http://wpos.app/
-Version: 7.4.1
+Version: 8.0.5
 WC requires at least: 3.0
-WC tested up to: 10.2.1 
+WC tested up to: 10.2.2
 Text Domain: openpos
 License: GPL version 2 or later - http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 */
@@ -148,7 +148,7 @@ if(is_plugin_active( 'woocommerce/woocommerce.php' ))
             }
             update_option('_openpos_product_version_0',time());
             // Activation code here...
-            
+            flush_rewrite_rules();
         }
     }
     if(!function_exists('openpos_deactivation'))
@@ -156,6 +156,7 @@ if(is_plugin_active( 'woocommerce/woocommerce.php' ))
         function openpos_deactivation() {
             // unregister schedule
             wp_clear_scheduled_hook( 'openpos_daily_event' );
+            flush_rewrite_rules();
         }
     }
 

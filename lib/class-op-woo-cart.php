@@ -124,7 +124,7 @@ if(!class_exists('OP_Woo_Cart'))
 
             return $cart_data;
         }
-        public function getShippingMethod($shipping_data,$cart_data){
+        public function getShippingMethod($shipping_data,$cart_data,$is_api=false){
             global $op_woo;
             do_action('op_get_shipping_method_before',$shipping_data,$cart_data);
             $address = isset($shipping_data['address']) ? $shipping_data['address'] : '';
@@ -139,94 +139,200 @@ if(!class_exists('OP_Woo_Cart'))
             {
                 $country = $store_country;
             }
-            WC()->cart->empty_cart();
-            WC()->session->cleanup_sessions();
-            $cart = new WC_Cart();
-
-            $items = $cart_data['items'];
-            foreach($items as $item)
-            {
-                $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
-                $product_qty = isset($item['qty']) ? $item['qty'] : 0;
-
-                if($product_id && $product_qty)
-                {
-                    $_product = wc_get_product($product_id);
-                    
-                    if($_product)
-                    {
-                        $parent_id = $product_id;
-                        $variation_id = 0;
-                        if($_product->get_type() == 'variation')
-                        {
-                            $parent_id = $_product->get_parent_id();
-                            $variation_id = $product_id;
-                        }
-                        try{
-
-                            $cart->add_to_cart($parent_id,$product_qty,$variation_id);
-    
-                        }catch (Exception $e)
-                        {
-                            print_r($e);die;
-                        }
-                    }
-                }
-            }
-
-
-            $cart->calculate_totals();
-
-            $customer = $cart->get_customer();
-            $customer->set_shipping_state($state);
-            $customer->set_shipping_address($address);
-            $customer->set_shipping_postcode($postcode);
-            $customer->set_shipping_address_2($address_2);
-            $customer->set_shipping_country($country);
-            $customer->set_shipping_city($city);
-
-            $customer->set_billing_state($state);
-            $customer->set_billing_address($address);
-            $customer->set_billing_postcode($postcode);
-            $customer->set_billing_address_2($address_2);
-            $customer->set_billing_country($country);
-            $customer->set_billing_city($city);
-
-            $customer->set_calculated_shipping(false);
-            $cart->calculate_shipping();
-            $packages = WC()->shipping()->get_packages();
             $methods_rates = array();
-
-
-            foreach($packages as $package)
+            if(!$is_api)
             {
-                $package_rates = $package['rates'];
-                foreach($package_rates as $package_rate)
+                WC()->cart->empty_cart();
+                WC()->session->cleanup_sessions();
+                $cart = new WC_Cart();
+
+                $items = $cart_data['items'];
+                foreach($items as $item)
                 {
-                    $id = $package_rate->get_id();
-                    $cost = $package_rate->get_cost();
-                    if(!$cost)
+                    $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+                    $product_qty = isset($item['qty']) ? $item['qty'] : 0;
+
+                    if($product_id && $product_qty)
                     {
-                        $cost = 0;
+                        $_product = wc_get_product($product_id);
+                        
+                        if($_product)
+                        {
+                            $parent_id = $product_id;
+                            $variation_id = 0;
+                            if($_product->get_type() == 'variation')
+                            {
+                                $parent_id = $_product->get_parent_id();
+                                $variation_id = $product_id;
+                            }
+                            try{
+
+                                $cart->add_to_cart($parent_id,$product_qty,$variation_id);
+        
+                            }catch (Exception $e)
+                            {
+                                print_r($e);die;
+                            }
+                        }
                     }
-                    $tax = $package_rate->get_shipping_tax();
-                    $label = $package_rate->get_label();
-                    $tmp = array(
-                        'code' => $id,
-                        'label' => $label,
-                        'title' => sprintf('%s (%s : %s)',$label,__('Cost','openpos'),strip_tags(wc_price($cost+ $tax))),
-                        'cost' => $cost,
-                        'tax' => $tax,
+                }
+
+
+                $cart->calculate_totals();
+
+                $customer = $cart->get_customer();
+                $customer->set_shipping_state($state);
+                $customer->set_shipping_address($address);
+                $customer->set_shipping_postcode($postcode);
+                $customer->set_shipping_address_2($address_2);
+                $customer->set_shipping_country($country);
+                $customer->set_shipping_city($city);
+
+                $customer->set_billing_state($state);
+                $customer->set_billing_address($address);
+                $customer->set_billing_postcode($postcode);
+                $customer->set_billing_address_2($address_2);
+                $customer->set_billing_country($country);
+                $customer->set_billing_city($city);
+
+                $customer->set_calculated_shipping(false);
+                $cart->calculate_shipping();
+                $packages = WC()->shipping()->get_packages();
+                
+
+
+                foreach($packages as $package)
+                {
+                    $package_rates = $package['rates'];
+                    foreach($package_rates as $package_rate)
+                    {
+                        $id = $package_rate->get_id();
+                        $cost = $package_rate->get_cost();
+                        if(!$cost)
+                        {
+                            $cost = 0;
+                        }
+                        $tax = $package_rate->get_shipping_tax();
+                        $label = $package_rate->get_label();
+                        $tmp = array(
+                            'code' => $id,
+                            'label' => $label,
+                            'title' => sprintf('%s (%s : %s)',$label,__('Cost','openpos'),strip_tags(wc_price($cost+ $tax))),
+                            'cost' => $cost,
+                            'tax' => $tax,
+                        );
+                        $methods_rates[$id] = $tmp;
+                    }
+                }
+                do_action('op_get_shipping_method_after',$shipping_data,$cart_data);
+                WC()->session->cleanup_sessions();
+                WC()->cart->empty_cart();
+            }else{
+                
+                if (isset($cart_data['items']) && !empty($cart_data['items'])) {
+                    $package = array(
+                        'contents'        => array(),
+                        'contents_cost'   => 0,
+                        'applied_coupons' => array(),
+                        'destination'     => array(
+                            'country'   => $country,
+                            'state'     => $state,
+                            'postcode'  => $postcode,
+                            'city'      => $city,
+                            'address'   => $address,
+                            'address_2' => $address_2,
+                        ),
                     );
-                    $methods_rates[$id] = $tmp;
+                    
+
+                    foreach ($cart_data['items'] as $item) {
+                        $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+                        $qty = isset($item['qty']) ? $item['qty'] : 1;
+                        if ($product_id && $qty) {
+                            $product = wc_get_product($product_id);
+                            if ($product) {
+                                $package['contents'][$product_id] = array(
+                                    'product_id'   => $product_id,
+                                    'data'         => $product,
+                                    'quantity'     => $qty,
+                                    'line_total'   => $item['final_price'] * $qty,
+                                    'line_tax'     => $item['total_tax'] ,
+                                );
+                                $package['contents_cost'] += $item['total'];
+                            }else{
+                                $package['contents'][$product_id] = array(
+                                    'product_id'   => $product_id,
+                                    'data'         => array(),
+                                    'quantity'     => $qty,
+                                    'line_total'   => $item['final_price'] * $qty,
+                                    'line_tax'     => $item['total_tax'] ,
+                                );
+                                $package['contents_cost'] += $item['total'];
+                            }
+                        }
+                    }
+
+                    $methods_rates = $this->get_available_shipping_methods($package['destination'], $package['contents']);
+                    
+                    
                 }
             }
-            do_action('op_get_shipping_method_after',$shipping_data,$cart_data);
-            WC()->session->cleanup_sessions();
-            WC()->cart->empty_cart();
+            
             return apply_filters('op_shipping_method_data',array_values($methods_rates));
         }
-        public function getShippingCost($shipping_data,$cart_data){
+        function get_available_shipping_methods( $address, $cart_items ) {
+            
+            WC()->cart->empty_cart();
+        
+            
+            foreach ( $cart_items as $item ) {
+                WC()->cart->add_to_cart( $item['product_id'], $item['quantity'] );
+            }
+            $packages = [
+                [
+                    'contents'        => WC()->cart->get_cart(),
+                    'contents_cost'   => WC()->cart->get_cart_contents_total(),
+                    'applied_coupons' => WC()->cart->get_applied_coupons(),
+                    'user'            => [
+                        'ID' => get_current_user_id(),
+                    ],
+                    'destination'     => [
+                        'country'   => $address['country'],
+                        'state'     => $address['state'],
+                        'postcode'  => $address['postcode'],
+                        'city'      => $address['city'],
+                        'address'   => $address['address_1'],
+                        'address_2' => $address['address_2'] ?? '',
+                    ],
+                ]
+            ];
+            $shipping = new WC_Shipping();
+            $shipping->calculate_shipping( $packages );
+        
+            $available_methods = [];
+        
+            foreach ( $shipping->get_packages() as $package ) {
+                foreach ( $package['rates'] as $rate_id => $rate ) {
+
+                    
+                    $tax = method_exists($rate, 'get_shipping_tax') ? $rate->get_shipping_tax() : 0;
+                    $label = $rate->get_label();
+                    $cost = (float) $rate->get_cost();
+                    $available_methods[$rate_id] = [
+                        'code'    => $rate_id,
+                        'id'    => $rate_id,
+                        'label' => $rate->get_label(),
+                        'cost'  => (float) $rate->get_cost(),
+                        'tax' => $tax,
+                        'title' => sprintf('%s (%s : %s)',$label,__('Cost','openpos'),strip_tags(wc_price($cost+ $tax))),
+                    ];
+                }
+            }
+        
+            return $available_methods;
+        }
+        
+        public function getShippingCost($shipping_data,$cart_data,$is_rest = false){
             global $op_woo;
             $address = isset($shipping_data['']) ? $shipping_data['address'] : '';
             $address_2 = isset($shipping_data['']) ? $shipping_data['address_2'] : '';
@@ -240,47 +346,54 @@ if(!class_exists('OP_Woo_Cart'))
             {
                 $country = $store_country;
             }
-            $session = WC()->session;
-            $cart = new WC_Cart();
-
-            $items = $cart_data['items'];
-            foreach($items as $item)
-            {
-                $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
-                $product_qty = isset($item['qty']) ? $item['qty'] : 0;
-                if($product_id && $product_qty)
-                {
-                    $cart->add_to_cart($product_id,$product_qty);
-                }
-            }
-            $cart->calculate_totals();
-            $shipping_method = $shipping_data['shipping_method'];
-            $customer = $cart->get_customer();
-            $customer->set_shipping_state($state);
-            $customer->set_shipping_address($address);
-            $customer->set_shipping_postcode($postcode);
-            $customer->set_shipping_address_2($address_2);
-            $customer->set_shipping_country($country);
-            $customer->set_shipping_city($city);
-            $customer->set_calculated_shipping(false);
-            $cart->calculate_shipping();
-            $packages = WC()->shipping()->get_packages();
             $shipping_cost = array();
             $shipping_tax = array();
             $shipping_methods = array();
-            foreach($packages as $package)
+            if(!$is_rest)
             {
-                $package_rates = $package['rates'];
-                foreach($package_rates as $package_rate)
+                $session = WC()->session;
+                $cart = new WC_Cart();
+    
+                $items = $cart_data['items'];
+                foreach($items as $item)
                 {
-
-                    $method_id = $package_rate->method_id;
-                    if($method_id == $shipping_method)
+                    $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+                    $product_qty = isset($item['qty']) ? $item['qty'] : 0;
+                    if($product_id && $product_qty)
                     {
-                        $shipping_methods[] = $package_rate;
+                        $cart->add_to_cart($product_id,$product_qty);
                     }
                 }
+                $cart->calculate_totals();
+                $shipping_method = $shipping_data['shipping_method'];
+                $customer = $cart->get_customer();
+                $customer->set_shipping_state($state);
+                $customer->set_shipping_address($address);
+                $customer->set_shipping_postcode($postcode);
+                $customer->set_shipping_address_2($address_2);
+                $customer->set_shipping_country($country);
+                $customer->set_shipping_city($city);
+                $customer->set_calculated_shipping(false);
+                $cart->calculate_shipping();
+                $packages = WC()->shipping()->get_packages();
+                
+                foreach($packages as $package)
+                {
+                    $package_rates = $package['rates'];
+                    foreach($package_rates as $package_rate)
+                    {
+    
+                        $method_id = $package_rate->method_id;
+                        if($method_id == $shipping_method)
+                        {
+                            $shipping_methods[] = $package_rate;
+                        }
+                    }
+                }
+            }else{
+                //rest api calc shipping method
             }
+            
             foreach($shipping_methods as $shipping_method)
             {
                 $id = $shipping_method->get_id();
@@ -311,123 +424,128 @@ if(!class_exists('OP_Woo_Cart'))
             }
             return array();
         }
-        public function getCartDiscount($cart_data){
+        public function getCartDiscount($cart_data,$is_api = false){
             $result = array();
-            $session = WC()->session;
-            $cart = new WC_Cart();
+            
             $customer_data = $cart_data['customer'];
-
-            if(!empty($customer_data)) {
-
-                if ($customer_data['id'] && $customer_data['id'] > 0) {
-                    wp_set_current_user($customer_data['id']);
-                }
-
-            }
-            $items = $cart_data['items'];
-            foreach($items as $item)
+            if(!$is_api)
             {
-                $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
-                $product_qty = isset($item['qty']) ? $item['qty'] : 0;
-                if($product_id && $product_qty)
-                {
-                    $cart->add_to_cart($product_id,$product_qty);
+                $cart = new WC_Cart();
+                if(!empty($customer_data)) {
+
+                    if ($customer_data['id'] && $customer_data['id'] > 0) {
+                        wp_set_current_user($customer_data['id']);
+                    }
+    
                 }
+                $items = $cart_data['items'];
+                foreach($items as $item)
+                {
+                    $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+                    $product_qty = isset($item['qty']) ? $item['qty'] : 0;
+                    if($product_id && $product_qty)
+                    {
+                        $cart->add_to_cart($product_id,$product_qty);
+                    }
+                }
+    
+                $post_customer_data = array();
+                if(!empty($customer_data))
+                {
+                    $customer = $cart->get_customer();
+    
+    
+                    if(isset($customer_data['email']) && $customer_data['email'])
+                    {
+                        $customer->set_email($customer_data['email']);
+                        $post_customer_data['billing_email'] = $customer_data['email'];
+                    }
+                    if(isset($customer_data['firstname']) && $customer_data['firstname'])
+                    {
+                        $customer->set_first_name($customer_data['firstname']);
+                        $post_customer_data['billing_first_name'] = $customer_data['firstname'];
+                    }
+                    if(isset($customer_data['lastname']) && $customer_data['lastname'])
+                    {
+                        $customer->set_last_name($customer_data['lastname']);
+                        $post_customer_data['billing_last_name'] = $customer_data['lastname'];
+                    }
+                    if($customer_data['address'])
+                    {
+                        $customer->set_address($customer_data['address']);
+                        $post_customer_data['billing_address_1'] = $customer_data['address'];
+                    }
+    
+                    if(isset($customer_data['address_2']) && $customer_data['address_2'])
+                    {
+                        $customer->set_address_2($customer_data['address_2']);
+                        $post_customer_data['billing_address_2'] = $customer_data['address_2'];
+                    }
+    
+                    if(isset($customer_data['state']) && $customer_data['state'])
+                    {
+                        $customer->set_state($customer_data['state']);
+                        $post_customer_data['billing_state'] = $customer_data['state'];
+                    }
+    
+                    if(isset($customer_data['city']) && $customer_data['city'])
+                    {
+                        $customer->set_city($customer_data['city']);
+                        $post_customer_data['billing_city'] = $customer_data['city'];
+                    }
+    
+                    if(isset($customer_data['country']) && $customer_data['country'])
+                    {
+                        $customer->set_country($customer_data['country']);
+                        $post_customer_data['billing_country'] = $customer_data['country'];
+                    }
+    
+                    if(isset($customer_data['postcode']) && $customer_data['postcode'])
+                    {
+                        $customer->set_postcode($customer_data['postcode']);
+                        $post_customer_data['billing_postcode'] = $customer_data['postcode'];
+                    }
+                    WC()->customer = $customer;
+    
+                }
+                WC()->session->set('refresh_totals', true);
+                $cart->calculate_totals();
+                WC()->cart = $cart;
+    
+                $post_data = implode('&',$post_customer_data);
+                $_POST['billing_email'] = $customer_data['email'];
+                $_POST['post_data'] = $post_data;
+                $_GET['wc-ajax'] = 'update_order_review';
+    
+                
+                $cart->calculate_totals();
+                
+                $discount_amount = 0;
+                $coupons  = WC()->cart->get_coupons();
+                $discount_type = 'fixed';
+                foreach($coupons as $coupon)
+                {
+                    $discount_amount += $coupon->get_amount();
+                    $tmp_discount_type = $coupon->get_discount_type();
+                    if($tmp_discount_type == 'percent')
+                    {
+                        $discount_type = 'percent';
+                    }
+                }
+                if($discount_amount)
+                {
+                    $result = array(
+                        'discount_amount' => $discount_amount,
+                        'discount_type' => $discount_type // percent , fixed
+                        
+                    );
+                }
+    
+                wp_set_current_user(0);
+            }else{
+                // api calc discount
             }
-
-            $post_customer_data = array();
-            if(!empty($customer_data))
-            {
-                $customer = $cart->get_customer();
-
-
-                if(isset($customer_data['email']) && $customer_data['email'])
-                {
-                    $customer->set_email($customer_data['email']);
-                    $post_customer_data['billing_email'] = $customer_data['email'];
-                }
-                if(isset($customer_data['firstname']) && $customer_data['firstname'])
-                {
-                    $customer->set_first_name($customer_data['firstname']);
-                    $post_customer_data['billing_first_name'] = $customer_data['firstname'];
-                }
-                if(isset($customer_data['lastname']) && $customer_data['lastname'])
-                {
-                    $customer->set_last_name($customer_data['lastname']);
-                    $post_customer_data['billing_last_name'] = $customer_data['lastname'];
-                }
-                if($customer_data['address'])
-                {
-                    $customer->set_address($customer_data['address']);
-                    $post_customer_data['billing_address_1'] = $customer_data['address'];
-                }
-
-                if(isset($customer_data['address_2']) && $customer_data['address_2'])
-                {
-                    $customer->set_address_2($customer_data['address_2']);
-                    $post_customer_data['billing_address_2'] = $customer_data['address_2'];
-                }
-
-                if(isset($customer_data['state']) && $customer_data['state'])
-                {
-                    $customer->set_state($customer_data['state']);
-                    $post_customer_data['billing_state'] = $customer_data['state'];
-                }
-
-                if(isset($customer_data['city']) && $customer_data['city'])
-                {
-                    $customer->set_city($customer_data['city']);
-                    $post_customer_data['billing_city'] = $customer_data['city'];
-                }
-
-                if(isset($customer_data['country']) && $customer_data['country'])
-                {
-                    $customer->set_country($customer_data['country']);
-                    $post_customer_data['billing_country'] = $customer_data['country'];
-                }
-
-                if(isset($customer_data['postcode']) && $customer_data['postcode'])
-                {
-                    $customer->set_postcode($customer_data['postcode']);
-                    $post_customer_data['billing_postcode'] = $customer_data['postcode'];
-                }
-                WC()->customer = $customer;
-
-            }
-            WC()->session->set('refresh_totals', true);
-            $cart->calculate_totals();
-            WC()->cart = $cart;
-
-            $post_data = implode('&',$post_customer_data);
-            $_POST['billing_email'] = $customer_data['email'];
-            $_POST['post_data'] = $post_data;
-            $_GET['wc-ajax'] = 'update_order_review';
-
             
-            $cart->calculate_totals();
-            
-            $discount_amount = 0;
-            $coupons  = WC()->cart->get_coupons();
-            $discount_type = 'fixed';
-            foreach($coupons as $coupon)
-            {
-                $discount_amount += $coupon->get_amount();
-                $tmp_discount_type = $coupon->get_discount_type();
-                if($tmp_discount_type == 'percent')
-                {
-                    $discount_type = 'percent';
-                }
-            }
-            if($discount_amount)
-            {
-                $result = array(
-                    'discount_amount' => $discount_amount,
-                    'discount_type' => $discount_type // percent , fixed
-                    
-                );
-            }
-
-            wp_set_current_user(0);
             return $result;
         }
         public function getPosCart($register_id){

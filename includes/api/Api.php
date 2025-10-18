@@ -77,17 +77,26 @@ if(!class_exists('OP_REST_API'))
         public function permission_callback(WP_REST_Request $request = null){
             
             if ($request && !$this->check_auth_header($request)) {
-                return new WP_Error('rest_forbidden', __('Unauthorized', 'openpos'), array('status' => 401));
+                return new WP_Error('op_rest_forbidden', __('Unauthorized', 'openpos'), array('status' => 0));
             }
             return true;
         }
+        
         protected function check_auth_header(WP_REST_Request $request) {
             $session_id = $request->get_param('session', '');
             if($session_id)
             {
                 $session_data = $this->session_class->data($session_id);
+                $route = $request->get_route();
+                $source = $request->get_param('source', 'manual');
+                if(strpos($route,'/auth/logout') !== false && $source === 'remote')
+                {
+                    return true;
+                }
                 if($session_data)
                 {
+                    global $op_session_data;
+                    $op_session_data = $session_data;
                     $this->session_data = $session_data;
                     return true;
                 }
@@ -136,6 +145,29 @@ if(!class_exists('OP_REST_API'))
             $pow = pow(10,$decimal);
             $number =  1 * $price* $pow ;
             return floor($number);
+        }
+        public function rest_api_limit(WP_REST_Request $request = null){
+            $result = true;
+            $ip = $_SERVER['REMOTE_ADDR'];
+            $key = 'api_rate_' . md5($ip);
+
+            $limit =  apply_filters('rest_api_limit_request',5); // limit 5 requests fail
+            $duration =  apply_filters('rest_api_limit_duration',120); // wait 120 seconds
+
+
+            $requests = get_transient($key);
+            if ($requests === false) {
+                $requests = 1;
+                set_transient($key, $requests, $duration);
+            } else {
+                $requests++;
+                set_transient($key, $requests, $duration);
+            }
+
+            if ($requests > $limit) {
+                $result = false;
+            }
+            return $result;
         }
         
 

@@ -34,6 +34,80 @@ class Openpos_Front{
             }
            return $result; 
         });
+
+        //add openpos url page
+        add_filter('query_vars', function($vars) {
+            $vars[] = 'openpos';
+            $vars[] = 'openpos_sw';
+            $vars[] = 'openpos_kitchen';
+            $vars[] = 'openpos_bill';
+            return $vars;
+        });
+        add_action('template_redirect', function() {
+            if (get_query_var('openpos')) {
+                status_header(200);
+                nocache_headers();
+                global $op_in_pos_screen;
+                $op_in_pos_screen = true;
+                $this->registerScripts();
+                require_once trailingslashit(OPENPOS_DIR) . 'templates/front/pos.php';
+                exit;
+            }
+            if (get_query_var('openpos_kitchen')) {
+                global $op_in_kitchen_screen;
+                $op_in_kitchen_screen = true; 
+                $this->registerKitchenScripts();
+                require_once trailingslashit(OPENPOS_DIR) . 'templates/front/kitchen.php';
+                exit;
+            }
+            if (get_query_var('openpos_bill')) {
+                global $op_in_bill_screen;
+                $op_in_bill_screen = true;
+                $this->registerBillScripts();
+                require_once trailingslashit(OPENPOS_DIR) . 'templates/front/bill.php';
+                exit;
+            }
+            if (get_query_var('openpos_sw')) {
+                header('Content-Type: application/javascript');
+                readfile(OPENPOS_DIR . '/pos/service-worker.js');
+                exit;
+            }
+            
+        });
+        add_action('init', function() {
+            $value = get_option('openpos_base', '');
+            $openpos_kitchen_base_value = get_option('openpos_kitchen_base', '');
+            $_openpos_bill_basevalue = get_option('openpos_bill_base', '');
+            if($value)
+            {
+                add_filter('redirect_canonical', function ($redirect_url, $requested_url) {
+                    if (strpos($requested_url, 'service-worker.js') !== false) {
+                        return false; 
+                    }
+                    return $redirect_url;
+                }, 10, 2);
+                $value = trim(esc_attr($value),'/');
+                add_rewrite_rule("^{$value}/service-worker\.js/?$", 'index.php?openpos_sw=1', 'top');
+                add_rewrite_rule("^{$value}/?", 'index.php?openpos=1', 'top');
+                
+            }
+            if($openpos_kitchen_base_value)
+            {
+                $openpos_kitchen_base_value = trim(esc_attr($openpos_kitchen_base_value),'/');
+                add_rewrite_rule("^{$openpos_kitchen_base_value}/?$', 'index.php?openpos_kitchen=1", 'top');
+                
+            }
+            if($_openpos_bill_basevalue)
+            {
+                $_openpos_bill_basevalue = trim(esc_attr($_openpos_bill_basevalue),'/');
+                add_rewrite_rule("^{$_openpos_bill_basevalue}/?$', 'index.php?openpos_bill=1", 'top');
+                
+            }
+              
+                
+            
+        });
+        
     }
     function plugins_loaded()
     {
@@ -128,7 +202,7 @@ class Openpos_Front{
     public function registerScripts(){
         global $op_in_pos_screen;
         if($op_in_pos_screen)
-        {
+        {  
             $info = $this->_core->getPluginInfo();
             $custom_css = $this->settings_api->get_option('pos_custom_css','openpos_pos');
             $stock_manager = $this->settings_api->get_option('pos_stock_manage','openpos_general');
@@ -204,10 +278,18 @@ class Openpos_Front{
             $pos_pwa_enable = $this->settings_api->get_option('pos_pwa_enable','openpos_general');
            // pos_pwa_enable
            if($pos_pwa_enable != 'no'){
+                $value = get_option('openpos_base', '');
+                $service_worker = OPENPOS_URL."/pos/service-worker.js?v=".esc_attr($info['Version']);
+                if($value)
+                {
+                    $value = trim(esc_attr($value),'/');
+                    $service_worker = home_url( '/'.$value.'/service-worker.js' );
+                    
+                }
                 wp_add_inline_script('openpos.pos.main',"
                     if ('serviceWorker' in navigator) {
                         console.log('register service worker');
-                        navigator.serviceWorker.register('./service-worker.js?v=".esc_attr($info['Version'])."').then(function(registration) {
+                        navigator.serviceWorker.register('".$service_worker."').then(function(registration) {
                             console.log('ServiceWorker registration successful with scope:',  registration.scope);
                         }).catch(function(error) {
                             console.log('ServiceWorker registration failed:', error);
@@ -215,16 +297,71 @@ class Openpos_Front{
                     }
                 ");
            }
+
+           $global_setting = array();
            $openpos_login_mode = $this->settings_api->get_option('openpos_login_mode','openpos_pos');
+
+           
+           $enable_rest_ful = apply_filters('pos_enable_rest_ful',true );
+           $action_url = admin_url('admin-ajax.php');
+           if($enable_rest_ful)
+           {
+                $action_url = get_rest_url(null,'/op/v1');
+           }
+           $enable_rest_ful_text = $enable_rest_ful ? 'yes': 'no';
+
+           $global_setting['action_url'] = $action_url;
+           $global_setting['restful'] = $enable_rest_ful_text;
+
+           $global_setting['assets_url'] = OPENPOS_URL.'/pos/assets/';
+
+
+           $pos_setting = array();
+           
            if($openpos_login_mode == 'pin')
            {
-               
-                wp_add_inline_script('openpos.pos.head',"
-                    var global = global || window;
-                    global.pos_setting = {login_mode : 'pin'};
-                    console.log(global);
-                ",'before');
+                $pos_setting['login_mode'] = 'pin';
            }
+
+           $lang = $this->settings_api->get_option('pos_language','openpos_pos');
+            if(!$lang || $lang == '_auto')
+            {
+                $lang = false;
+            }
+            if($lang)
+            {
+                $global_setting['pos_lang'] = $lang;
+            }
+            if(!empty($pos_setting))
+            {
+                $global_setting['pos_setting'] = $pos_setting;
+            }
+
+            $global_setting['pos_receipt_css'] = json_encode($this->_core->getReceiptFontCss());
+            $global_setting['version'] = esc_js($info['Version']);
+
+            $allow_location = false; 
+            if($allow_location){
+                $global_setting['allow_location'] = 'no';
+            }
+
+
+            $inline_js = 'var global = global || window;';
+            foreach($global_setting as $key => $value)
+            {
+                if(is_array($value) || is_object($value))
+                {
+                    $inline_js .= "global.$key = ".json_encode($value).";";
+                }else{
+                    $inline_js .= "global.$key = '$value';";
+                }
+                
+            }
+           
+           
+           wp_add_inline_script('openpos.pos.head',$inline_js,'before');
+
+          
            
                 
         }
@@ -1268,75 +1405,86 @@ class Openpos_Front{
                 $transaction = $transaction_data;
             }
             $transaction_id =  isset($transaction['id']) ? $transaction['id'] : 0;
+            $transient_key = 'adding_transaction_'.$transaction_id;
+            $done_transient_key = 'done_transaction_'.$transaction_id;
             if($transaction_id)
             {
-                $transient_key = 'adding_transaction_'.$transaction_id;
+                
                 $transaction_data = get_transient($transient_key);
+                $done_transaction_data = get_transient($done_transient_key);
+
                 if ( false !== $transaction_data ) {
                     throw new Exception(__('Transaction is being processed. Please wait a moment.','openpos' ));
                 }
-
-                $transaction_data = $op_transaction->formatDataFromJson($transaction,$session_data);
+                if ( false !== $done_transaction_data ) {
+                    $result['status'] = 1;
+                    $result['data'] = $done_transaction_data;
+                }else{
+                    $transaction_data = $op_transaction->formatDataFromJson($transaction,$session_data);
 
            
-                $in_amount = isset($transaction_data['in_amount']) ? floatval($transaction_data['in_amount']) : 0;
-                $out_amount = isset($transaction_data['out_amount']) ? floatval($transaction_data['out_amount']) : 0;
-                $payment_code = isset($transaction_data['payment_code']) ? $transaction_data['payment_code'] : 'cash';
-                $cashdrawer_id = isset($transaction_data['login_cashdrawer_id']) ? $transaction_data['login_cashdrawer_id'] : 0;
-                $currency = isset($transaction_data['currency']) ? $transaction_data['currency'] : null;
-                $currency_rate = 1;
-                if($currency != null)
-                {
-                    if(isset($currency['rate']))
+                    $in_amount = isset($transaction_data['in_amount']) ? floatval($transaction_data['in_amount']) : 0;
+                    $out_amount = isset($transaction_data['out_amount']) ? floatval($transaction_data['out_amount']) : 0;
+                    $payment_code = isset($transaction_data['payment_code']) ? $transaction_data['payment_code'] : 'cash';
+                    $cashdrawer_id = isset($transaction_data['login_cashdrawer_id']) ? $transaction_data['login_cashdrawer_id'] : 0;
+                    $currency = isset($transaction_data['currency']) ? $transaction_data['currency'] : null;
+                    $currency_rate = 1;
+                    if($currency != null)
                     {
-                        $currency_rate = 1* $currency['rate'];
-                    }
-                }
-
-                set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
-               
-                //start check transaction exist
-                $exist_transaction = $op_transaction->get_by_local_id($transaction_id);
-                
-                $id = 0;
-                $is_new = false;
-                if(!$exist_transaction)
-                {
-                    
-                    $id = $op_transaction->add($transaction_data);
-                    $is_new = true;
-
-                }else{
-                    $transaction = $exist_transaction;
-                    $id = $transaction['id'];
-                   
-                }
-                delete_transient( $transient_key );
-                //end
-                if($id)
-                {
-                    //add cash drawer balance
-                    $is_added_balance = get_post_meta($id,'_add_balance_amount',true);
-                    if( $is_new || !$is_added_balance )
-                    {
-                        if($payment_code == 'cash')
+                        if(isset($currency['rate']))
                         {
-                            $balance = ($in_amount - $out_amount) / $currency_rate;
-
-                            $op_register->addCashBalance($cashdrawer_id,$balance);
-    
-                            add_post_meta($id,'_add_balance_amount',$balance);
+                            $currency_rate = 1* $currency['rate'];
                         }
                     }
+    
+                    set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
+                   
+                    //start check transaction exist
+                    $exist_transaction = $op_transaction->get_by_local_id($transaction_id);
                     
-                    $result['status'] = 1;
-                    $result['data'] = $id;
-                    if($is_new)
+                    $id = 0;
+                    $is_new = false;
+                    if(!$exist_transaction)
                     {
-                        do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
+                        
+                        $id = $op_transaction->add($transaction_data);
+                        $is_new = true;
+    
+                    }else{
+                        $transaction = $exist_transaction;
+                        $id = $transaction['id'];
+                       
                     }
                     
+                    //end
+                    if($id)
+                    {
+                        //add cash drawer balance
+                        $is_added_balance = get_post_meta($id,'_add_balance_amount',true);
+                        if( $is_new || !$is_added_balance )
+                        {
+                            if($payment_code == 'cash')
+                            {
+                                $balance = ($in_amount - $out_amount) / $currency_rate;
+    
+                                $op_register->addCashBalance($cashdrawer_id,$balance);
+        
+                                add_post_meta($id,'_add_balance_amount',$balance);
+                            }
+                        }
+                        set_transient( $done_transient_key, $id, HOUR_IN_SECONDS );
+                        $result['status'] = 1;
+                        $result['data'] = $id;
+                        if($is_new)
+                        {
+                            do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
+                        }
+                        
+                    }
+                    delete_transient( $transient_key );
                 }
+
+                
 
             }
 
@@ -4019,7 +4167,17 @@ class Openpos_Front{
                 $session_data['product_sync'] = true;
                 $session_data['date_format'] = $this->_core->convert_to_js_date_format(get_option( 'date_format' ));
                 $session_data['time_format'] = $this->_core->convert_to_js_date_format(get_option( 'time_format' ));
-
+                $currency_pos = get_option( 'woocommerce_currency_pos' );
+                $default_currency  = array(
+                    'decimal' => wc_get_price_decimals(),
+                    'decimal_separator' => wc_get_price_decimal_separator(),
+                    'thousand_separator' => wc_get_price_thousand_separator(),
+                    'currency_pos' => $currency_pos,
+                    'code' => get_woocommerce_currency(), 
+                    'symbol' => html_entity_decode(get_woocommerce_currency_symbol()), 
+                    'rate' => 1
+                );
+                $session_data['currency'] = $default_currency;
 
                 if($this->settings_api->get_option('pos_auto_sync','openpos_pos') == 'no')
                 {

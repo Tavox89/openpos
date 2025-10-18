@@ -487,11 +487,15 @@ if(!class_exists('OP_REST_API_Order'))
         private function _add_order($order_data,$order_source,$is_clear = true){
             $result = array('status' => 0,'data' => array(),'message' => '');
             try{
+                global $_op_warehouse_id;
                 $use_hpos = $this->core_class->enable_hpos();
                 $session_data = $this->session_data;
                 $_op_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                 $login_cashdrawer_id = isset($session_data['login_cashdrawer_id']) ? $session_data['login_cashdrawer_id'] : 0;
                 $order_parse_data = apply_filters('op_new_order_data',$order_data,$session_data);
+
+               
+
                 $order = $this->order_class->add_order($order_parse_data,$session_data,$is_clear,$order_source);
 
                 $transactions = isset($order_parse_data['transactions']) ? $order_parse_data['transactions'] : array();
@@ -509,11 +513,16 @@ if(!class_exists('OP_REST_API_Order'))
                             //save transaction
                             $transaction_data = apply_filters('op_order_transaction_data',$transaction,$order,$order_parse_data);
                             $transaction_id =  isset($transaction_data['id']) ? $transaction_data['id'] : 0;
+                            $done_transient_key = 'done_transaction_'.$transaction_id;
+                            $transient_key = 'adding_transaction_'.$transaction_id;
                             if($transaction_id)
                             {
-                                $transient_key = 'adding_transaction_'.$transaction_id;
+                               
                                 $transaction_data = get_transient($transient_key);
-                                if ( false === $transaction_data ) {
+                                $done_transaction_data = get_transient($done_transient_key);
+                                
+
+                                if ( false === $transaction_data && false === $done_transaction_data ) {
                                     $transaction_data = $this->transaction_class->formatDataFromJson($transaction,$session_data);
                                     $in_amount = isset($transaction_data['in_amount']) ? floatval($transaction_data['in_amount']) : 0;
                                     $out_amount = isset($transaction_data['out_amount']) ? floatval($transaction_data['out_amount']) : 0;
@@ -547,7 +556,7 @@ if(!class_exists('OP_REST_API_Order'))
                                         $id = $transaction['id'];
                                     
                                     }
-                                    delete_transient( $transient_key );
+                                    
                                     //end
                                     if($id)
                                     {
@@ -564,11 +573,13 @@ if(!class_exists('OP_REST_API_Order'))
                                                 add_post_meta($id,'_add_balance_amount',$balance);
                                             }
                                         }
+                                        set_transient( $done_transient_key, $id, DAY_IN_SECONDS );
                                         if($is_new)
                                         {
                                             do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
                                         }
                                     }
+                                    delete_transient( $transient_key );
                                 }
                             }
                             
@@ -623,7 +634,7 @@ if(!class_exists('OP_REST_API_Order'))
                     
                     $result['status'] = 1;
                     $result['data'] = $this->woo_class->formatWooOrder($order->get_id());
-                    do_action('op_add_order_final_after',$result['response']['data']);
+                    do_action('op_add_order_final_after',$result['data']);
                 }else{
                     throw new Exception(__('Can not create order.','openpos'));
                 }
@@ -655,6 +666,7 @@ if(!class_exists('OP_REST_API_Order'))
             try{
                 $use_hpos = $this->core_class->enable_hpos();
                 $session_data = $this->session_data;
+                global $_op_warehouse_id;
                 $_op_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                 $order_data_json = $request->get_param('order');//stripslashes($_REQUEST['order']);
                 $order_data = json_decode($order_data_json,true);
@@ -1534,6 +1546,7 @@ if(!class_exists('OP_REST_API_Order'))
                 'api_message' => ''
             );
             try{
+                global $_op_warehouse_id;
                 $session_data = $this->session_data;
                 $use_hpos = $this->core_class->enable_hpos();
                 $login_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
@@ -1671,6 +1684,7 @@ if(!class_exists('OP_REST_API_Order'))
                 'api_message' => ''
             );
             try{
+                global $_op_warehouse_id;
                 $session_data = $this->session_data;
                 $login_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                 $_op_warehouse_id = $login_warehouse_id;

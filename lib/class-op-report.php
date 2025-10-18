@@ -117,9 +117,13 @@ if(!class_exists('OP_Report'))
                 $z_reports = $query->get_posts();
                 
             }
+            if(!$data_str)
+            {
+                $data_str = json_encode($data);
+            }
             $insert_data = array(
                 'post_title'=> $title,
-                'post_content'=> json_encode($data),
+                'post_content'=> $data_str ,
                 'post_type'=> $this->_zpost_type,
                 'post_author'=> $user_id,
                 'post_status'  => 'publish'
@@ -131,6 +135,7 @@ if(!class_exists('OP_Report'))
             $id = wp_insert_post($insert_data);
             if($id)
             {
+               
                 add_post_meta($id,'login_time',$login_time);
                 add_post_meta($id,'logout_time',$logout_time);
 
@@ -221,7 +226,7 @@ if(!class_exists('OP_Report'))
             if($report_type == 'x_report')
             {
                 
-
+                
                 $posts = $this->getZReportPosts($start_timestamp,$end_timestamp);
                 
                 $table_data = array();
@@ -254,6 +259,12 @@ if(!class_exists('OP_Report'))
 
                     $content = $p->post_content;
                     $zreport_data = json_decode($content,true);
+                    if(!is_array($zreport_data) || empty($zreport_data)){
+                        $content = get_post_meta($p->ID,'json_data',true);;
+                        $zreport_data = json_decode($content,true);
+                    }
+                    
+               
                     
                     $refund_total = isset($zreport_data['refund_total']) ? $zreport_data['refund_total'] : 0;
 
@@ -310,6 +321,7 @@ if(!class_exists('OP_Report'))
                     $session_data = isset($zreport_data['session_data']) ? $zreport_data['session_data'] : array();
                     $session = isset($session_data['session']) ? $session_data['session'] : '';
                     $order_total = isset($zreport_data['order_total']) ? $zreport_data['order_total'] : 0;
+                   
                     $tmp = array(
                         ''.$p->ID,
                         $z_report_name.'<br/><small><i>'.get_the_date('d-m-Y H:i:s',$p).'</i></small>',
@@ -504,9 +516,6 @@ if(!class_exists('OP_Report'))
             
             if($report_type == 'z_report')
             {
-               
-                
-               
 
                 $table_data = array();
                 $result['orders_export_data'] = array();
@@ -612,6 +621,10 @@ if(!class_exists('OP_Report'))
         
                             $content = $p->post_content;
                             $zreport_data = json_decode($content,true);
+                            if(!is_array($zreport_data) || empty($zreport_data)){
+                                $content = get_post_meta($p->ID,'json_data',true);;
+                                $zreport_data = json_decode($content,true);
+                            }
                             
                            
                             if($report_outlet_id >= 0 &&  $report_outlet_id != $login_warehouse_id)
@@ -954,6 +967,8 @@ if(!class_exists('OP_Report'))
 
                 $json_str = get_post_meta($post->ID,'json_data',true);
                 $json_data = $json_str ? json_decode($json_str,true) : array();
+
+                
                 
                 $refund_total = 0;
                 

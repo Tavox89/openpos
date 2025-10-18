@@ -50,6 +50,9 @@ class Openpos_Core
             unload_textdomain( 'openpos', true );
             load_textdomain( 'openpos', trailingslashit(OPENPOS_DIR).'languages/openpos-' . $locale . '.mo' );
             load_plugin_textdomain( 'openpos', false,  trailingslashit(OPENPOS_DIR).'languages/' );
+
+            
+            
         //end
     }
     public function getDefaultProductPostStatus(){
@@ -1579,220 +1582,214 @@ class Openpos_Core
     }
     function getAllLanguage(){
         $langs = array(
-            "ab",
-            "aa",
-            "af",
-            "ak",
-            "sq",
-            "am",
-            "ar",
-            "an",
-            "hy",
-            "as",
-            "av",
-            "ae",
-            "ay",
-            "az",
-            "bm",
-            "ba",
-            "eu",
-            "be",
-            "bn",
-            "bh",
-            "bi",
-            "bs",
-            "br",
-            "bg",
-            "my",
-            "ca",
-            "ch",
-            "ce",
-            "ny",
-            "zh",
-            "zh-Hans",
-            "zh-Hant",
-            "cv",
-            "kw",
-            "co",
-            "cr",
-            "hr",
-            "cs",
-            "da",
-            "dv",
-            "nl",
-            "dz",
-            "en",
-            "eo",
-            "et",
-            "ee",
-            "fo",
-            "fj",
-            "fi",
-            "fr",
-            "ff",
-            "gl",
-            "gd",
-            "gv",
-            "ka",
-            "de",
-            "el",
-            "kl",
-            "gn",
-            "gu",
-            "ht",
-            "ha",
-            "he",
-            "hz",
-            "hi",
-            "ho",
-            "hu",
-            "is",
-            "io",
-            "ig",
-            "id",
-            "in",
-            "ia",
-            "ie",
-            "iu",
-            "ik",
-            "ga",
-            "it",
-            "ja",
-            "jv",
-            "kl",
-            "kn",
-            "kr",
-            "ks",
-            "kk",
-            "km",
-            "ki",
-            "rw",
-            "rn",
-            "ky",
-            "kv",
-            "kg",
-            "ko",
-            "ku",
-            "kj",
-            "lo",
-            "la",
-            "lv",
-            "li",
-            "ln",
-            "lt",
-            "lu",
-            "lg",
-            "lb",
-            "gv",
-            "mk",
-            "mg",
-            "ms",
-            "ml",
-            "mt",
-            "mi",
-            "mr",
-            "mh",
-            "mo",
-            "mn",
-            "na",
-            "nv",
-            "ng",
-            "nd",
-            "ne",
-            "no",
-            "nb",
-            "nn",
-            "ii",
-            "oc",
-            "oj",
-            "cu",
-            "or",
-            "om",
-            "os",
-            "pi",
-            "ps",
-            "fa",
-            "pl",
-            "pt",
-            "pa",
-            "qu",
-            "rm",
-            "ro",
-            "ru",
-            "se",
-            "sm",
-            "sg",
-            "sa",
-            "sr",
-            "sh",
-            "st",
-            "tn",
-            "sn",
-            "ii",
-            "sd",
-            "si",
-            "ss",
-            "sk",
-            "sl",
-            "so",
-            "nr",
-            "es",
-            "su",
-            "sw",
-            "ss",
-            "sv",
-            "tl",
-            "ty",
-            "tg",
-            "ta",
-            "tt",
-            "te",
-            "th",
-            "bo",
-            "ti",
-            "to",
-            "ts",
-            "tr",
-            "tk",
-            "tw",
-            "ug",
-            "uk",
-            "ur",
-            "uz",
-            "ve",
-            "vi",
-            "vo",
-            "wa",
-            "cy",
-            "wo",
-            "fy",
-            "xh",
-            "yi",
-            "ji",
-            "yo",
-            "za",
-            "zu",
+            "ab" => __("Abkhazian", "openpos"),
+            "aa" => __("Afar", "openpos"),
+            "af" => __("Afrikaans", "openpos"),
+            "ak" => __("Akan", "openpos"),
+            "sq" => __("Albanian", "openpos"),
+            "am" => __("Amharic", "openpos"),
+            "ar" => __("Arabic", "openpos"),
+            "an" => __("Aragonese", "openpos"),
+            "hy" => __("Armenian", "openpos"),
+            "as" => __("Assamese", "openpos"),
+            "av" => __("Avaric", "openpos"),
+            "ae" => __("Avestan", "openpos"),
+            "ay" => __("Aymara", "openpos"),
+            "az" => __("Azerbaijani", "openpos"),
+            "bm" => __("Bambara", "openpos"),
+            "ba" => __("Bashkir", "openpos"),
+            "eu" => __("Basque", "openpos"),
+            "be" => __("Belarusian", "openpos"),
+            "bn" => __("Bengali", "openpos"),
+            "bh" => __("Bihari", "openpos"),
+            "bi" => __("Bislama", "openpos"),
+            "bs" => __("Bosnian", "openpos"),
+            "br" => __("Breton", "openpos"),
+            "bg" => __("Bulgarian", "openpos"),
+            "my" => __("Burmese", "openpos"),
+            "ca" => __("Catalan", "openpos"),
+            "ch" => __("Chamorro", "openpos"),
+            "ce" => __("Chechen", "openpos"),
+            "ny" => __("Chichewa", "openpos"),
+            "zh" => __("Chinese", "openpos"),
+            "zh-Hans" => __("Chinese (Simplified)", "openpos"),
+            "zh-Hant" => __("Chinese (Traditional)", "openpos"),
+            "cv" => __("Chuvash", "openpos"),
+            "kw" => __("Cornish", "openpos"),
+            "co" => __("Corsican", "openpos"),
+            "cr" => __("Cree", "openpos"),
+            "hr" => __("Croatian", "openpos"),
+            "cs" => __("Czech", "openpos"),
+            "da" => __("Danish", "openpos"),
+            "dv" => __("Divehi", "openpos"),
+            "nl" => __("Dutch", "openpos"),
+            "dz" => __("Dzongkha", "openpos"),
+            "en" => __("English", "openpos"),
+            "eo" => __("Esperanto", "openpos"),
+            "et" => __("Estonian", "openpos"),
+            "ee" => __("Ewe", "openpos"),
+            "fo" => __("Faroese", "openpos"),
+            "fj" => __("Fijian", "openpos"),
+            "fi" => __("Finnish", "openpos"),
+            "fr" => __("French", "openpos"),
+            "ff" => __("Fulah", "openpos"),
+            "gl" => __("Galician", "openpos"),
+            "gd" => __("Gaelic", "openpos"),
+            "gv" => __("Manx", "openpos"),
+            "ka" => __("Georgian", "openpos"),
+            "de" => __("German", "openpos"),
+            "el" => __("Greek", "openpos"),
+            "kl" => __("Kalaallisut", "openpos"),
+            "gn" => __("Guarani", "openpos"),
+            "gu" => __("Gujarati", "openpos"),
+            "ht" => __("Haitian", "openpos"),
+            "ha" => __("Hausa", "openpos"),
+            "he" => __("Hebrew", "openpos"),
+            "hz" => __("Herero", "openpos"),
+            "hi" => __("Hindi", "openpos"),
+            "ho" => __("Hiri Motu", "openpos"),
+            "hu" => __("Hungarian", "openpos"),
+            "is" => __("Icelandic", "openpos"),
+            "io" => __("Ido", "openpos"),
+            "ig" => __("Igbo", "openpos"),
+            "id" => __("Indonesian", "openpos"),
+            "in" => __("Indonesian (old code)", "openpos"),
+            "ia" => __("Interlingua", "openpos"),
+            "ie" => __("Interlingue", "openpos"),
+            "iu" => __("Inuktitut", "openpos"),
+            "ik" => __("Inupiaq", "openpos"),
+            "ga" => __("Irish", "openpos"),
+            "it" => __("Italian", "openpos"),
+            "ja" => __("Japanese", "openpos"),
+            "jv" => __("Javanese", "openpos"),
+            "kn" => __("Kannada", "openpos"),
+            "kr" => __("Kanuri", "openpos"),
+            "ks" => __("Kashmiri", "openpos"),
+            "kk" => __("Kazakh", "openpos"),
+            "km" => __("Khmer", "openpos"),
+            "ki" => __("Kikuyu", "openpos"),
+            "rw" => __("Kinyarwanda", "openpos"),
+            "rn" => __("Kirundi", "openpos"),
+            "ky" => __("Kirghiz", "openpos"),
+            "kv" => __("Komi", "openpos"),
+            "kg" => __("Kongo", "openpos"),
+            "ko" => __("Korean", "openpos"),
+            "ku" => __("Kurdish", "openpos"),
+            "kj" => __("Kwanyama", "openpos"),
+            "lo" => __("Lao", "openpos"),
+            "la" => __("Latin", "openpos"),
+            "lv" => __("Latvian", "openpos"),
+            "li" => __("Limburgan", "openpos"),
+            "ln" => __("Lingala", "openpos"),
+            "lt" => __("Lithuanian", "openpos"),
+            "lu" => __("Luba-Katanga", "openpos"),
+            "lg" => __("Ganda", "openpos"),
+            "lb" => __("Luxembourgish", "openpos"),
+            "mk" => __("Macedonian", "openpos"),
+            "mg" => __("Malagasy", "openpos"),
+            "ms" => __("Malay", "openpos"),
+            "ml" => __("Malayalam", "openpos"),
+            "mt" => __("Maltese", "openpos"),
+            "mi" => __("Maori", "openpos"),
+            "mr" => __("Marathi", "openpos"),
+            "mh" => __("Marshallese", "openpos"),
+            "mo" => __("Moldavian", "openpos"),
+            "mn" => __("Mongolian", "openpos"),
+            "na" => __("Nauru", "openpos"),
+            "nv" => __("Navajo", "openpos"),
+            "ng" => __("Ndonga", "openpos"),
+            "nd" => __("North Ndebele", "openpos"),
+            "ne" => __("Nepali", "openpos"),
+            "no" => __("Norwegian", "openpos"),
+            "nb" => __("Norwegian Bokmål", "openpos"),
+            "nn" => __("Norwegian Nynorsk", "openpos"),
+            "ii" => __("Sichuan Yi", "openpos"),
+            "oc" => __("Occitan", "openpos"),
+            "oj" => __("Ojibwa", "openpos"),
+            "cu" => __("Church Slavic", "openpos"),
+            "or" => __("Oriya", "openpos"),
+            "om" => __("Oromo", "openpos"),
+            "os" => __("Ossetian", "openpos"),
+            "pi" => __("Pali", "openpos"),
+            "ps" => __("Pashto", "openpos"),
+            "fa" => __("Persian", "openpos"),
+            "pl" => __("Polish", "openpos"),
+            "pt" => __("Portuguese", "openpos"),
+            "pa" => __("Punjabi", "openpos"),
+            "qu" => __("Quechua", "openpos"),
+            "rm" => __("Romansh", "openpos"),
+            "ro" => __("Romanian", "openpos"),
+            "ru" => __("Russian", "openpos"),
+            "se" => __("Northern Sami", "openpos"),
+            "sm" => __("Samoan", "openpos"),
+            "sg" => __("Sango", "openpos"),
+            "sa" => __("Sanskrit", "openpos"),
+            "sr" => __("Serbian", "openpos"),
+            "sh" => __("Serbo-Croatian", "openpos"),
+            "st" => __("Southern Sotho", "openpos"),
+            "tn" => __("Tswana", "openpos"),
+            "sn" => __("Shona", "openpos"),
+            "sd" => __("Sindhi", "openpos"),
+            "si" => __("Sinhala", "openpos"),
+            "ss" => __("Swati", "openpos"),
+            "sk" => __("Slovak", "openpos"),
+            "sl" => __("Slovenian", "openpos"),
+            "so" => __("Somali", "openpos"),
+            "nr" => __("South Ndebele", "openpos"),
+            "es" => __("Spanish", "openpos"),
+            "su" => __("Sundanese", "openpos"),
+            "sw" => __("Swahili", "openpos"),
+            "sv" => __("Swedish", "openpos"),
+            "tl" => __("Tagalog", "openpos"),
+            "ty" => __("Tahitian", "openpos"),
+            "tg" => __("Tajik", "openpos"),
+            "ta" => __("Tamil", "openpos"),
+            "tt" => __("Tatar", "openpos"),
+            "te" => __("Telugu", "openpos"),
+            "th" => __("Thai", "openpos"),
+            "bo" => __("Tibetan", "openpos"),
+            "ti" => __("Tigrinya", "openpos"),
+            "to" => __("Tonga", "openpos"),
+            "ts" => __("Tsonga", "openpos"),
+            "tr" => __("Turkish", "openpos"),
+            "tk" => __("Turkmen", "openpos"),
+            "tw" => __("Twi", "openpos"),
+            "ug" => __("Uighur", "openpos"),
+            "uk" => __("Ukrainian", "openpos"),
+            "ur" => __("Urdu", "openpos"),
+            "uz" => __("Uzbek", "openpos"),
+            "ve" => __("Venda", "openpos"),
+            "vi" => __("Vietnamese", "openpos"),
+            "vo" => __("Volapük", "openpos"),
+            "wa" => __("Walloon", "openpos"),
+            "cy" => __("Welsh", "openpos"),
+            "wo" => __("Wolof", "openpos"),
+            "fy" => __("Western Frisian", "openpos"),
+            "xh" => __("Xhosa", "openpos"),
+            "yi" => __("Yiddish", "openpos"),
+            "ji" => __("Yiddish (old code)", "openpos"),
+            "yo" => __("Yoruba", "openpos"),
+            "za" => __("Zhuang", "openpos"),
+            "zu" => __("Zulu", "openpos"),
         );
-        sort($langs);
         $result = array(
             '_auto' => 'Auto Detect'
         );
-        foreach($langs as $lang)
+        foreach($langs as $lang_code => $lang)
         {
-            $result[$lang] = $lang;
+            $result[$lang_code] = $lang;
         }
-
+        
         return $result;
     }
 
-    public function formatReceiptSetting($setting,$op_incl_tax_mode= false)
-    {
+    public function formatShortcode($html){
         $payment_methods = '<ul class="payment-methods">';
         $payment_methods .= '<% payment_method.forEach(function(payment){ %>';
         $payment_methods .= '<li><%= payment.name %> : <%= payment.paid %></li>';
 
         $payment_methods .= '<% if (payment.code == "cash" && payment.return > 0) { %>';
-        $payment_methods .= '<li>'.__('Return','openpos').' : <%= payment.return %></li>';
+        $payment_methods .= '<li>'.__('Return','wpos-lite').' : <%= payment.return %></li>';
         $payment_methods .= '<% } %>';
 
         $payment_methods .= '<% }); %>';
@@ -1811,6 +1808,12 @@ class Openpos_Core
             '[customer_email]' => '<%= customer.email %>',
             '[payment_method]' => $payment_methods,
         );
+       return str_replace(array_keys($rules), array_values($rules), html_entity_decode($html));
+    }
+
+    public function formatReceiptSetting($setting,$op_incl_tax_mode= false)
+    {
+        
 
         //receipt css
 
@@ -1831,7 +1834,7 @@ class Openpos_Core
 
         if(isset($setting['receipt_template_footer']))
         {
-            $setting['receipt_template_footer'] = str_replace(array_keys($rules), array_values($rules), html_entity_decode($setting['receipt_template_footer']));
+            $setting['receipt_template_footer'] = $this->formatShortcode($setting['receipt_template_footer']);
         }else{
             $setting['receipt_template_footer'] = '';
         }
@@ -1845,7 +1848,7 @@ class Openpos_Core
 
         if(isset($setting['receipt_template_header']))
         {
-            $setting['receipt_template_header'] = str_replace(array_keys($rules), array_values($rules), html_entity_decode($setting['receipt_template_header']));
+            $setting['receipt_template_header'] = $this->formatShortcode($setting['receipt_template_header']);
         }else{
             $setting['receipt_template_header'] = '';
         }
@@ -1966,13 +1969,50 @@ class Openpos_Core
         update_post_meta($product_id,'_openpos_product_version_'.$warehouse_id,$time);
 
         $parent_id = wp_get_post_parent_id($product_id);
+        $product_ids = array($product_id);
         if($parent_id)
         {
+            $product_ids[] = $parent_id;
             update_post_meta($parent_id,'_openpos_product_version_'.$warehouse_id,$time);
         }
+        //delete cache
+        $this->clear_product_cache($product_ids);
+        
 
         update_option('_openpos_product_version_'.$warehouse_id,$time);
         do_action('op_add_product_change_after',$product_id,$warehouse_id,$time,$this);
+    }
+    public function clear_all_product_cache(){
+        $cache_group = 'products';
+        $result = wp_cache_flush_group( $cache_group );
+        if(!$result)
+        {
+            return $result;
+        }
+        return __('Clear OpenPOS Product cache success','openpos');
+    }
+    public function clear_product_cache($product_ids = array()){
+        global $op_warehouse;
+        //remove cache
+        $cache_group = 'products';
+        $warehouses = $op_warehouse->warehouses();
+        foreach($warehouses as $w)
+        {
+            $warehouse_id = isset($w['id']) ? $w['id'] : 0;
+            foreach($product_ids as $pid)
+            {
+                $cache_keys[] = 'op_product_cache_'.$warehouse_id.'_'.$pid;
+                $cache_keys[] = 'op_parent_product_cache_'.$warehouse_id.'_'.$pid;
+                $cache_keys[] = 'op_tax_product_cache_'.$warehouse_id.'_'.$pid;
+                $cache_keys[] = 'op_variations_product_cache_'.$warehouse_id.'_'.$pid;
+                foreach($cache_keys as $cache_key)
+                {
+                    wp_cache_delete($cache_key, $cache_group );
+                }
+                
+            }
+        }
+        //end
     }
     public function formart_draft_order($order_data){
         $result = array();
@@ -2158,8 +2198,13 @@ class Openpos_Core
         return $content_type;
     }
     function get_pos_url($sub_str = ''){
-     
-        $pos_url = apply_filters('op_pos_url',OPENPOS_URL.'/pos/');
+        $value = get_option('openpos_base', '');
+        $pos_home_url =  OPENPOS_URL.'/pos/';
+        if($value)
+        {
+            $pos_home_url = home_url( '/'.$value.'/' );
+        }
+        $pos_url = apply_filters('op_pos_url',  $pos_home_url);
         if($sub_str)
         {
             $pos_url = trim(rtrim($pos_url,'/'));    
@@ -2170,38 +2215,77 @@ class Openpos_Core
     }
     function get_kitchen_url($wareshouse_id = 0,$base = false){
      
-        $pos_url = apply_filters('op_kitchen_url',OPENPOS_URL.'/kitchen/');
-       
-        if(!$base)
+        $value = get_option('openpos_kitchen_base', '');
+        $pos_home_url =  OPENPOS_URL.'/kitchen/';
+        if($value)
         {
-            $pos_url = rtrim($pos_url,'/');
-            $site_id = get_current_blog_id();
-            if($site_id)
-            {
-                $pos_url.= '/index.php?site='.$site_id.'&id='.$wareshouse_id;
-            }else{
-                $pos_url.= '/index.php?id='.$wareshouse_id;
-            }
-            
+            $pos_home_url = home_url( '/'.$value.'/' );
         }
-        return  $pos_url;
-    }
-    function get_bill_url($register_id = 0,$base = false){
-     
-        $pos_url = apply_filters('op_bill_url',OPENPOS_URL.'/bill/');
+
+
+        $pos_url = apply_filters('op_kitchen_url',$pos_home_url);
+       
         
         if(!$base)
         {
-            $pos_url = rtrim($pos_url,'/');
             $site_id = get_current_blog_id();
-            if($site_id)
+            if($value)
             {
-                $pos_url.= '/index.php?site='.$site_id.'&id='.$register_id;
+                $pos_url = add_query_arg( array(
+                    'site_id' => $site_id,
+                    'id' => $wareshouse_id,
+                ), $pos_url );
             }else{
-                $pos_url.= '/index.php?id='.$register_id;
+                $pos_url = rtrim($pos_url,'/');
+                
+                if($site_id)
+                {
+                    $pos_url.= '/index.php?site='.$site_id.'&id='.$wareshouse_id;
+                }else{
+                    $pos_url.= '/index.php?id='.$wareshouse_id;
+                }
             }
             
+            
         }
+        
+        
+        return  $pos_url;
+    }
+    function get_bill_url($register_id = 0,$base = false){
+        $value = get_option('openpos_bill_base', '');
+        $pos_home_url =  OPENPOS_URL.'/bill/';
+        if($value)
+        {
+            $pos_home_url = home_url( '/'.$value.'/' );
+        }
+        $pos_url = apply_filters('op_bill_url',OPENPOS_URL.'/bill/');
+        
+        
+        if(!$base)
+        {
+            $site_id = get_current_blog_id();
+            if($value) 
+            {
+                $pos_url = add_query_arg( array(
+                    'site_id' => $site_id,
+                    'id' => $register_id,
+                ), $pos_url );
+            }else{
+                $pos_url = rtrim($pos_url,'/');
+                
+                if($site_id)
+                {
+                    $pos_url.= '/index.php?site='.$site_id.'&id='.$register_id;
+                }else{
+                    $pos_url.= '/index.php?id='.$register_id;
+                }
+            }
+            
+            
+        }
+        
+        
         
         return  $pos_url;
     }
@@ -2237,7 +2321,24 @@ class Openpos_Core
     }
     
     function plugins_loaded(){
-       
+        add_filter( 'rest_request_after_callbacks', function( $response, $handler, $request ) {
+            if ( is_wp_error( $response ) ) {
+                $error_code = $response->get_error_code();
+                if ( $error_code === 'op_rest_forbidden' ) {
+                    return new WP_REST_Response( [
+                        'code' => $error_code,
+                        'api_message' => 'You are logged out.',
+                        'response' => array(
+                            'status' => -1,
+                            'message' => $response->get_error_message(),
+                            'data' => array()
+                        ),
+                    ], 200 );
+                }
+            }
+        
+            return $response;
+        }, 10, 3 );
         if ( OrderUtil::custom_orders_table_usage_is_enabled() ) {
            $this->_enable_hpos = true;
         } 
@@ -2511,7 +2612,21 @@ class Openpos_Core
         }
     }
 
-    
+    function rounding_price($price,$decimal=0){
+        // get the decimal setting currency 
+        //$decimal = get_option('woocommerce_price_num_decimals',2);
+        if(!$decimal)
+        {
+            $decimal = 0;
+        }
+        if(!$price)
+        {
+            return $price;
+        }
+        $ten_power = pow(10,$decimal);
+        $price = round($price * $ten_power)/$ten_power;
+        return $price;
+    }
     
 
 }

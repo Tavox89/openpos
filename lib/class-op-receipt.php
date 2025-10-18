@@ -805,7 +805,7 @@ if(!class_exists('OP_Receipt'))
                         }
                         $email = new OP_Email_Customer_Order_Receipt();
                         ;
-                        if($email->trigger( $order->get_id(), $order_data )){
+                        if($order && $email->trigger( $order->get_id(), $order_data )){
                             $result['status'] = 1;
                             $result['message'] = __('Receipt has been sent','openpos');
                             if($source != 'manual' && $order_id)

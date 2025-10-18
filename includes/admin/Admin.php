@@ -160,7 +160,7 @@ class Openpos_Admin{
 
 
     function admin_init() {
-
+        $openpos_type = $this->settings_api->get_option('openpos_type','openpos_pos');
         add_filter('plugin_row_meta',array($this,'plugin_row_meta'),100,3);
 
         $current_page = isset( $_REQUEST['page'])  ?  esc_attr($_REQUEST['page']): false;
@@ -181,9 +181,60 @@ class Openpos_Admin{
             //initialize settings
             $this->settings_api->admin_init();
         }
-        
+        $this->settings_save();
+        add_settings_section(
+            'openpos_permalink_section',
+            __('OpenPOS Permalink', 'openpos'),
+            function () {
+                echo '<p>Path for POS panel.</p>';
+            },
+            'permalink'
+        );
+    
+        add_settings_field(
+            'openpos_base',
+            __('POS base', 'openpos'),
+            array($this,'openpos_base_field_callback'),
+            'permalink',
+            'openpos_permalink_section'
+        );
+        if($openpos_type == 'restaurant')
+        {
+            add_settings_field(
+                'openpos_kitchen_base',
+                __('Kitchen base', 'openpos'),
+                array($this,'openpos_kitchen_base_field_callback'),
+                'permalink',
+                'openpos_permalink_section'
+            );
+        }
+        add_settings_field(
+            'openpos_bill_base',
+            __('Bill base', 'openpos'),
+            array($this,'openpos_bill_base_field_callback'),
+            'permalink',
+            'openpos_permalink_section'
+        );
+
+
+
 
         $this->admin_notice_init();
+    }
+    function openpos_kitchen_base_field_callback() { 
+        $value = get_option('openpos_kitchen_base', '');
+        echo '<input type="text" name="openpos_kitchen_base" value="' . esc_attr($value) . '" class="regular-text code" />';
+        echo '<p class="description">'.__('Example: <code>/kitchen</code>.Leave empty to use plain url','openpos').'</p>';
+    }
+    function openpos_bill_base_field_callback() { 
+        $value = get_option('openpos_bill_base', '');
+        echo '<input type="text" name="openpos_bill_base" value="' . esc_attr($value) . '" class="regular-text code" />';
+        echo '<p class="description">'.__('Example: <code>/bill</code>.Leave empty to use plain url','openpos').'</p>';
+    }
+    function openpos_base_field_callback() {
+        $value = get_option('openpos_base', '');
+        echo '<input type="text" name="openpos_base" value="' . esc_attr($value) . '" class="regular-text code" />';
+        echo '<p class="description">'.__('Example: <code>/openpos</code>.Leave empty to use plain url','openpos').'</p>';
     }
     function plugin_row_meta($plugin_meta, $plugin_file, $plugin_data){
         $plugin = isset($plugin_data['TextDomain']) ? $plugin_data['TextDomain']:'';
@@ -3988,12 +4039,14 @@ class Openpos_Admin{
                                     __('Email','openpos'),
                                     __('Sold Total','openpos'),
                                     __('Sold QTY','openpos'),
+                                    __('Total Order','openpos'),
                                 );
                                 $orders_export_data[] = array(
                                     __('User','openpos'),
                                     __('Email','openpos'),
                                     __('Sold Total','openpos'),
                                     __('Sold QTY','openpos'),
+                                    __('Total Order','openpos'),
                                 );
                             }else{
                                
@@ -4238,6 +4291,8 @@ class Openpos_Admin{
                                 {
                                     $summary_data['total_sales'] += $report_data['total_sale'];
                                     $summary_data['total_qty'] += $report_data['total_qty'];
+                                    $order_ids = array_unique($report_data['order_ids']);
+                                    $effect_orders += $order_ids;
                                     $user_name = __('Unknown');
                                     $user_email = __('Unknown');
                                     if($user_id)
@@ -4254,16 +4309,17 @@ class Openpos_Admin{
                                         $user_email,
                                         wc_price($report_data['total_sale']),
                                         $report_data['total_qty'],
+                                        count($order_ids),
                                     );
                                     $tmp_export = array(
                                         $user_name,
                                         $user_email,
                                         $report_data['total_sale'],
                                         $report_data['total_qty'],
+                                        count($order_ids),
                                     );
                                     $orders_export_data[] = $tmp_export;
-                                    $order_ids = array_unique($report_data['order_ids']);
-                                    $effect_orders += $order_ids;
+                                    
 
                                     $chart_data_js['data']['labels'][] = $user_name;
                                     $chart_data_js['data']['datasets'][0]['label'] = __('Seller sales','openpos');
@@ -7651,6 +7707,33 @@ class Openpos_Admin{
 
         
         exit;
+    }
+    public function settings_save() {
+		if ( ! is_admin() ) {
+			return;
+		}
+        $flush = false;
+        if (isset($_POST['openpos_base'])) {
+            
+            $value = wc_sanitize_permalink( wp_unslash( $_POST['openpos_base'] ) ); 
+            update_option('openpos_base', $value ?: '');
+            $flush = true;
+        }
+        if (isset($_POST['openpos_kitchen_base'])) {
+            
+            $value = wc_sanitize_permalink( wp_unslash( $_POST['openpos_kitchen_base'] ) ); 
+            update_option('openpos_kitchen_base', $value ?: '');
+            $flush = true;
+        }
+        if (isset($_POST['openpos_bill_base'])) {
+            $value = wc_sanitize_permalink( wp_unslash( $_POST['openpos_bill_base'] ) ); 
+            update_option('openpos_bill_base', $value ?: '');
+            $flush = true;
+        }
+        if( $flush )
+        {
+            flush_rewrite_rules(); // flush sau khi user lưu
+        }
     }
     
 

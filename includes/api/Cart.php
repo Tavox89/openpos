@@ -429,7 +429,7 @@ if(!class_exists('OP_REST_API_Cart'))
     
     
                 $result['response']['status'] = 1;
-                $result['response']['data'] = $this->cart_class->getShippingMethod($by_data,$cart);
+                $result['response']['data'] = $this->cart_class->getShippingMethod($by_data,$cart,true);
     
                 do_action('op_get_online_shipping_method',$result,$session_data);
                 $result['response'] = apply_filters('op_get_online_shipping_method_response',$result['response'],$session_data);
@@ -467,7 +467,7 @@ if(!class_exists('OP_REST_API_Cart'))
                 if($method)
                 {
                     $result['response']['status'] = 1;
-                    $cost = $this->cart_class->getShippingCost($by_data,$cart);
+                    $cost = $this->cart_class->getShippingCost($by_data,$cart,true);
                     if(!empty($cost))
                     {
                         $result['response']['data']['calc_shipping_cost'] = $cost['cost'];
@@ -545,7 +545,7 @@ if(!class_exists('OP_REST_API_Cart'))
                     $cart_data = json_decode($request->get_param('cart'),true);
                     $coupon = new WC_Coupon($code);
                     
-                    $applied_coupons = isset($request['applied_codes']) ? json_decode(stripslashes($request['applied_codes']),true) : array();
+                    $applied_coupons = isset($request['applied_codes']) ? json_decode($request['applied_codes'],true) : array();
 
                     if(!empty($applied_coupons)){
                         

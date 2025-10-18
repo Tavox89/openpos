@@ -156,74 +156,84 @@ if(!class_exists('OP_REST_API_Transaction'))
                 $transaction = json_decode($request->get_param('transaction'),true);
                 
                 $transaction_id =  isset($transaction['id']) ? $transaction['id'] : 0;
+                $transient_key = 'adding_transaction_'.$transaction_id;
+                $done_transient_key = 'done_transaction_'.$transaction_id;
                 if($transaction_id)
                 {
-                    $transient_key = 'adding_transaction_'.$transaction_id;
+                    
+                    $done_transaction_data = get_transient($done_transient_key);
                     $transaction_data = get_transient($transient_key);
-                    if ( false !== $transaction_data ) {
-                        throw new Exception(__('Transaction is being processed. Please wait a moment.','openpos' ));
-                    }
-
-                    $transaction_data = $this->transaction_class->formatDataFromJson($transaction,$session_data);
-
-            
-                    $in_amount = isset($transaction_data['in_amount']) ? floatval($transaction_data['in_amount']) : 0;
-                    $out_amount = isset($transaction_data['out_amount']) ? floatval($transaction_data['out_amount']) : 0;
-                    $payment_code = isset($transaction_data['payment_code']) ? $transaction_data['payment_code'] : 'cash';
-                    $cashdrawer_id = isset($transaction_data['login_cashdrawer_id']) ? $transaction_data['login_cashdrawer_id'] : 0;
-                    $currency = isset($transaction_data['currency']) ? $transaction_data['currency'] : null;
-                    $currency_rate = 1;
-                    if($currency != null)
-                    {
-                        if(isset($currency['rate']))
-                        {
-                            $currency_rate = 1* $currency['rate'];
-                        }
-                    }
-
-                    set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
-                
-                    //start check transaction exist
-                    $exist_transaction = $this->transaction_class->get_by_local_id($transaction_id);
-                    
-                    $id = 0;
-                    $is_new = false;
-                    if(!$exist_transaction)
-                    {
-                        
-                        $id = $this->transaction_class->add($transaction_data);
-                        $is_new = true;
-
+                    if ( false !== $done_transaction_data ) {
+                        $result['response']['status'] = 1;
+                        $result['response']['data'] = $done_transaction_data;
                     }else{
-                        $transaction = $exist_transaction;
-                        $id = $transaction['id'];
-                    
-                    }
-                    delete_transient( $transient_key );
-                    //end
-                    if($id)
-                    {
-                        //add cash drawer balance
-                        $is_added_balance = get_post_meta($id,'_add_balance_amount',true);
-                        if( $is_new || !$is_added_balance )
+                        if ( false !== $transaction_data ) {
+                            throw new Exception(__('Transaction is being processed. Please wait a moment.','openpos' ));
+                        }
+    
+                        $transaction_data = $this->transaction_class->formatDataFromJson($transaction,$session_data);
+    
+                
+                        $in_amount = isset($transaction_data['in_amount']) ? floatval($transaction_data['in_amount']) : 0;
+                        $out_amount = isset($transaction_data['out_amount']) ? floatval($transaction_data['out_amount']) : 0;
+                        $payment_code = isset($transaction_data['payment_code']) ? $transaction_data['payment_code'] : 'cash';
+                        $cashdrawer_id = isset($transaction_data['login_cashdrawer_id']) ? $transaction_data['login_cashdrawer_id'] : 0;
+                        $currency = isset($transaction_data['currency']) ? $transaction_data['currency'] : null;
+                        $currency_rate = 1;
+                        if($currency != null)
                         {
-                            if($payment_code == 'cash')
+                            if(isset($currency['rate']))
                             {
-                                $balance = ($in_amount - $out_amount) / $currency_rate;
-
-                                $this->register_class->addCashBalance($cashdrawer_id,$balance);
-        
-                                add_post_meta($id,'_add_balance_amount',$balance);
+                                $currency_rate = 1* $currency['rate'];
                             }
                         }
+    
+                        set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
+                    
+                        //start check transaction exist
+                        $exist_transaction = $this->transaction_class->get_by_local_id($transaction_id);
                         
-                        $result['response']['status'] = 1;
-                        $result['response']['data'] = $id;
-                        if($is_new)
+                        $id = 0;
+                        $is_new = false;
+                        if(!$exist_transaction)
                         {
-                            do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
+                            
+                            $id = $this->transaction_class->add($transaction_data);
+                            $is_new = true;
+    
+                        }else{
+                            $transaction = $exist_transaction;
+                            $id = $transaction['id'];
+                        
                         }
+                        
+                        //end
+                        if($id)
+                        {
+                            //add cash drawer balance
+                            $is_added_balance = get_post_meta($id,'_add_balance_amount',true);
+                            if( $is_new || !$is_added_balance )
+                            {
+                                if($payment_code == 'cash')
+                                {
+                                    $balance = ($in_amount - $out_amount) / $currency_rate;
+    
+                                    $this->register_class->addCashBalance($cashdrawer_id,$balance);
+            
+                                    add_post_meta($id,'_add_balance_amount',$balance);
+                                }
+                            }
+                            set_transient( $done_transient_key, $id, DAY_IN_SECONDS );
+                            $result['response']['status'] = 1;
+                            $result['response']['data'] = $id;
+                            if($is_new)
+                            {
+                                do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
+                            }
+                        }
+                        delete_transient( $transient_key );
                     }
+                    
 
                 }
                 $result['code'] = 200;

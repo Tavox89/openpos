@@ -677,7 +677,7 @@ if(!class_exists('OP_Woo_Order'))
                     'order_number_formatted' => $this->formatOrderNumber($next_order_number,$pos_sequential_number_prefix)
                 );
                 $result['data'] = apply_filters('op_get_next_order_number_info',$order_number_info);
-    
+                $result['status'] = 1;
             }catch (Exception $e)
             {
                 $result['status'] = 0;
@@ -1608,6 +1608,7 @@ if(!class_exists('OP_Woo_Order'))
                         $item->set_total_tax($item_total_tax);
 
                         $item_total_before_discount = $_item['final_price'] * (1 * $_item['qty']);
+                        
                         $item_total_tax_before_discount = ($_item['final_price_incl_tax'] - $_item['final_price']) * (1 * $_item['qty']);
                         $item_total = $_item['total'];
 

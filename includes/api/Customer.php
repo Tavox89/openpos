@@ -114,7 +114,7 @@ if(!class_exists('OP_REST_API_Customer'))
             try{
                 $by = $request->get_param( 'by' ) ? $request->get_param( 'by' ) : '';
                 
-                $search_data = $request->get_param( 'by_data' ) ? json_decode(stripslashes($request->get_param( 'by_data' )),true) : '';
+                $search_data = $request->get_param( 'by_data' ) ? json_decode($request->get_param( 'by_data' ),true) : '';
                 $multi = $request->get_param( 'multi' ) == 'yes' ? true : false;
                 if(!$by)
                 {
@@ -177,7 +177,7 @@ if(!class_exists('OP_REST_API_Customer'))
             );
             try{
                 
-                $by_data = json_decode(stripslashes($request->get_param('by_data')),true);
+                $by_data = json_decode($request->get_param('by_data'),true);
                 $country = $by_data['country'];
                 $data = array();
                 if($country )
@@ -235,7 +235,7 @@ if(!class_exists('OP_REST_API_Customer'))
                     throw new Exception(__('Please enter customer data','openpos'));
                 }
                 
-                $customer_request_data = apply_filters('op_new_customer_request',$by_data);
+                $customer_request_data = apply_filters('op_new_customer_request', json_decode($by_data,true));
                 $customer_id = isset($customer_request_data['id']) &&  $customer_request_data['id'] != 'null'  ? $customer_request_data['id'] : 0;
 
                 $name = isset($customer_request_data['name']) ? $customer_request_data['name'] : '';
@@ -385,7 +385,7 @@ if(!class_exists('OP_REST_API_Customer'))
                     throw new Exception(__('Please enter customer data','openpos'));
                 }
                 
-                $customer_request_data = apply_filters('op_new_customer_request',$by_data);
+                $customer_request_data = apply_filters('op_new_customer_request',json_decode($by_data,true));
                 $customer_id = isset($customer_request_data['id']) &&  $customer_request_data['id'] != 'null'  ? $customer_request_data['id'] : 0;
 
                 $name = isset($customer_request_data['name']) ? $customer_request_data['name'] : '';

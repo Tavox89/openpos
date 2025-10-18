@@ -42,7 +42,7 @@ if(!class_exists('OP_REST_API_Extension'))
                            $url = $tmp_class->get_url();
                            if(!$url)
                            {
-                             $path = sprintf('admin-ajax.php?action=openpos&pos_action=app_view&session=%s&app=%s',$this->session_data['session'],$app_key);
+                             $path = sprintf('admin-ajax.php?action=openpos&pos_action=app_view&app=%s',$app_key);
                              $url = admin_url($path);
                            }
                            $tmp = array(

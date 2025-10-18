@@ -51,63 +51,7 @@ if(!class_exists('OP_REST_API_Product'))
         }
         private function _formatApiProduct($product_data,$session_data){
             return $product_data;
-            // $currency = $session_data['setting']['currency'];
-            // $decimal = $currency['decimal'];
-            // $price = $this->_convertToCent($product_data['price'],$decimal);
-            // $priceInclTax = $this->_convertToCent($product_data['price_incl_tax'],$decimal);
-            // $specialPrice = $this->_convertToCent($product_data['special_price'],$decimal);
-            // $options = array();
-            // $variations = array();
-            // foreach($product_data['options'] as $option)
-            // {
-            //     $options[] = $this->_formatOption($option);
-            // }
-            // foreach($product_data['variations'] as $variation)
-            // {
-            //     $variations[] = $this->_formatVariation($variation);
-            // }
-            // $product = array(
-            //     'id' => $product_data['id'],
-            //     'parent_id' => $product_data['parent_id'],
-            //     'parent_product' => null,
-            //     'name' => $product_data['name'],
-            //     'description' => isset($product_data['description']) ? $product_data['description'] : '',
-            //     'sku' => $product_data['sku'],
-            //     'barcode' => $product_data['barcode'],
-            //     'image' => $product_data['image'],
-            //     'group_items' => array(),
-            //     'bundles' => $product_data['bundles'],
-            //     'options' => $options,
-            //     'variations' => $variations,
-            //     'tax' =>  isset($product_data['tax']) ? $product_data['tax'] : array(),
-            //     'price' => $price,
-            //     'price_incl_tax' => $priceInclTax,
-            //     'price_included_tax' => isset($product_data['price_included_tax']) && $product_data['price_included_tax'] == 1 ? true : false,
-            //     'special_price' => $specialPrice,
-            //     'sale_from' => isset($product_data['special_start_at']) ? $product_data['special_start_at'] : 0,
-            //     'sale_to' => isset($product_data['special_end_at']) ? $product_data['special_end_at'] : 0, 
-            //     'discount_rules' => isset($product_data['discount_rules']) ? $product_data['discount_rules'] : array(),
-            //     'stock_status' => $product_data['stock_status'],
-            //     'stock_unit' => isset($product_data['stock_unit']) ? $product_data['stock_unit'] : '',
-            //     'qty' => $product_data['qty'],
-            //     'decimal_qty' => $product_data['decimal_qty'], // number of decimal places for quantity 
-            //     'manage_stock' => $product_data['manage_stock'],
-            //     'min_qty' =>  isset($product_data['min_qty']) ? $product_data['min_qty'] : 0, // Minimum quantity for purchase
-            //     'max_qty' =>  isset($product_data['max_qty']) ? $product_data['max_qty'] : 0, // Maximum quantity for purchase
-            //     'allow_decal' => isset($product_data['allow_decal']) && $product_data['allow_decal'] == 'yes' ? true : false, 
-            //     'allow_change_price' => $product_data['allow_change_price'], 
-            //     'product_type' => isset($product_data['product_type']) ? $product_data['product_type'] : '', // product type, simple, variable, bundle, group
-            //     'type' => $product_data['type'], // display type
-            //     'is_featured' => isset($product_data['is_featured']) ? $product_data['is_featured'] : false, // is featured product
-            //     'display' => $product_data['display'], 
-            //     'is_searchable' => isset($product_data['is_searchable']) ? $product_data['is_searchable'] : true, // is searchable product
-            //     'categories' => $product_data['categories'], 
-            //     'custom_notes' => $product_data['custom_notes'], 
-            //     'kitchen_area' => isset($product_data['kitchen_area']) ? $product_data['kitchen_area'] : array(), // kitchen area
-            //     'addition_info' => isset($product_data['addition_info']) ? $product_data['addition_info'] : array(), // kitchen area
-            // );
-
-            // return $product;
+            
         }
         public function products($request)
         {
@@ -127,9 +71,13 @@ if(!class_exists('OP_REST_API_Product'))
                 {
                     $term = sanitize_text_field($term);
                 }
-                $per_page = $request->get_param( 'per_page' );
+                $per_page = $request->get_param( 'per_page' ) ;
                 $page = $request->get_param( 'page' ) ? $request->get_param( 'page' ) : 1;
-                $rowCount = $per_page ? $per_page : 10;
+                if($page == 1)
+                {
+                    //$this->core_class->clear_all_product_cache();
+                }
+                $rowCount = $per_page ? $per_page : apply_filters('op_load_product_per_page',50);
                 $current = $page;
                 $offet = ($current -1) * $rowCount;
                 $sortBy = 'title';
@@ -160,7 +108,7 @@ if(!class_exists('OP_REST_API_Product'))
                 
                 $data = array('total_page' => $total_page, 'current_page' => $current,'term'=>$term);
         
-                $data['product'] = array();
+                $data['products'] = array();
                 
                 $show_out_of_stock = false;
                 $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
@@ -243,10 +191,18 @@ if(!class_exists('OP_REST_API_Product'))
                 $session_data = $this->session_data;
                 $login_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                 $local_db_version = $request->get_param( 'local_db_version' ) ? $request->get_param( 'local_db_version' ) : 0; 
+                $online_db_version = $request->get_param( 'online_db_version' ) ? $request->get_param( 'online_db_version' ) : 0; 
+                $page = $request->get_param( 'page' ) ? $request->get_param( 'page' ) : 1; 
+                if(!$page || !is_numeric($page))
+                {
+                    $page = 1;
+                }
                 $database_version = get_option('_openpos_product_version_'.$login_warehouse_id,0);
                 if($local_db_version > 0)
                 {
-                    $product_changed_data = $this->woo_class->getProductChanged($local_db_version,$login_warehouse_id);
+                    $per_page = 50;
+                    
+                    $product_changed_data = $this->woo_class->getProductChanged($local_db_version,$login_warehouse_id,$page,$per_page);
 
                     $product_ids = array();
                     foreach($product_changed_data['data'] as $product_id => $qty)
@@ -305,14 +261,22 @@ if(!class_exists('OP_REST_API_Product'))
 
                     }
                     $version = $product_changed_data['current_version'];
-                
+                    $found_posts = $product_changed_data['found_posts'];
+                    
+                    $next_page = 1;
                     if(empty($data['product']) &&  $version == 0)
                     {
                         $version = $database_version;
+                    }else{
+                        if($version == $local_db_version)
+                        {
+                            $next_page = 1 + $page;
+                        }
                     }
 
                     $result['response']['data'] = array(
                         'products' => $data['product'],
+                        'next_page' => $next_page,
                         'version' => $version
                     );
                 }else{
@@ -347,7 +311,7 @@ if(!class_exists('OP_REST_API_Product'))
 
                 $session_data = $this->session_data;
                 $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
-                $product_data = json_decode(stripslashes($request->get_param('product')),true);
+                $product_data = json_decode($request->get_param('product'),true);
                 $barcode = isset($product_data['barcode']) ? trim($product_data['barcode']) : '';
                 $name = isset($product_data['name']) ? trim($product_data['name']) : '';
                 $qty = isset($product_data['qty']) ? trim($product_data['qty']) : 0;
