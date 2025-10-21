@@ -1,0 +1,6 @@
+html.wp-toolbar {
+    padding-top: 0!important;
+}
+#wpadminbar{
+    display: none!important;
+}

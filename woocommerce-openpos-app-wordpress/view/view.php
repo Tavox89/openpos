@@ -1,0 +1,1 @@
+<iframe src="<?php echo get_admin_url(); ?>?session=<?php echo $session_id ; ?>" width="100%" height="100%" style="border:none;" ></iframe>

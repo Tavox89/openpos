@@ -1,0 +1,39 @@
+.openpos_product_batches_container{
+    padding: 3px 5px;
+}
+.warehouse-batches-container table{
+    width: 100%;
+    
+
+}
+.warehouse-batches-container table,
+.warehouse-batches-container tr,
+.warehouse-batches-container td,
+.warehouse-batches-container th{
+    border: solid 1px #999;
+    border-collapse: collapse;
+}
+.warehouse-batches-container{
+    border-bottom: solid 1px #ccc;
+    padding-bottom: 10px;
+    padding-top: 5px;
+}
+.warehouse-batches-container table tfoot{
+    background: #ccc;
+}
+
+.warehouse-batches-container td,
+.warehouse-batches-container th{
+    padding: 5px 0;
+    text-align: center;
+}
+.warehouse-batches-container  .suggestion-dismiss{
+    text-decoration: none;
+}
+.op-transfer-dialog-alert .ui-dialog-titlebar-close{
+    text-indent: -10000px;
+}
+.op-transfer-dialog-alert  .ui-dialog-buttonset button{
+    padding: 5px 10px;
+    text-transform: capitalize;
+}

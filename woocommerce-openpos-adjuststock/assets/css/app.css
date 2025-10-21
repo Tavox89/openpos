@@ -1,0 +1,16 @@
+/**/
+a.plus-qty:hover , a.reduct-qty:hover,
+a.plus-qty:focus , a.reduct-qty:focus,
+.plus-qty , .reduct-qty{
+    text-decoration: none;
+    outline: none;
+    width: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+.plus-qty{
+    color:green;
+}
+.reduct-qty{
+    color:red;
+}

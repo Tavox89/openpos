@@ -1,0 +1,72 @@
+.op-conten-wrap{
+    background: #fff;
+    padding: 5px 15px;
+    position: relative;
+}
+#op-stock-loading{
+    position: absolute;
+    background: #000;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    opacity: 0.5;
+    text-align: center;
+    vertical-align: middle;
+    color: red;
+    font-weight: bold;
+    font-size: 20px;
+    padding-top: 20%;
+}
+.transfer-cost{
+    max-width: 70px;
+}
+.transfer-qty{
+    max-width: 50px;
+    text-align: center;
+}
+.transfer-exp-date{
+    width: calc(100% - 20px); 
+    max-width: 120px;
+}
+
+.transfer-batch-no{
+    max-width: 100px;
+}
+.transfer-arrow-reduct:focus,
+.transfer-arrow-plus:focus,
+.transfer-arrow-reduct:hover,
+.transfer-arrow-plus:hover,
+.transfer-arrow-reduct:active,
+.transfer-arrow-plus:active,
+.transfer-arrow-reduct,
+.transfer-arrow-plus{
+    line-height: 30px;
+    padding: 5px;
+    font-size: 20px;
+    margin: 0;
+    text-decoration: none;
+    display: inline;
+    outline: none;
+    box-shadow: none;
+}
+.has-update,
+.transfer-arrow-reduct:hover,
+.transfer-arrow-plus:hover{
+    color: red;
+}
+.exp-row-container{
+    position: relative;
+    width: 100%;
+    display: block;
+}
+.row-calendar-icon{
+    padding: 3px;
+    font-size: 10px;
+    text-decoration: none;
+}
+.op-transfer-grid span.product-sku{
+    color: green;
+    font-size: 10px;
+}
+
