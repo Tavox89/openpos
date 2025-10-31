@@ -73,7 +73,7 @@ span.dining.takeaway{
     padding: 0;
     position: relative;
     float:left;
-    
+    border: solid 1px transparent;
 }
 .order-container{
     /* border: solid 1px #333;
@@ -368,4 +368,51 @@ body.menu-is-open{
         -webkit-transform: rotate(359deg);
         transform: rotate(359deg)
     }
+}
+
+/*start darkmode*/
+body.dark-mode .order-container{
+    background: #333;
+    color: #fff;
+}
+body.dark-mode {
+    background: #222;
+    color: #eee;
+}
+body.dark-mode .order-header,
+body.dark-mode .order-action {
+    background: #444;
+    color: #fff;
+}
+body.dark-mode .order-items li,
+body.dark-mode .order-items ul.item-options-label li {
+    background: #2a2a2a;
+    color: #fff;
+}
+body.dark-mode .order-items li:hover {
+    background: #444;
+}
+body.dark-mode .order-customer-name {
+    background: #005724;
+    color: #fff;
+}
+body.dark-mode .order-items .ready,
+body.dark-mode .all-servered {
+    color: #8bc34a;
+}
+body.dark-mode .item-note {
+    color: #ff5252;
+}
+body.dark-mode .order-header .order-time-ago,
+body.dark-mode .order-item-time,
+body.dark-mode .item-order-time,
+body.dark-mode .item-seller {
+    color: #bbb;
+}
+body.dark-mode  .kitchen-order{
+    
+    border: solid 1px #fff;
+}
+.modal-content{
+    color:#000;
 }

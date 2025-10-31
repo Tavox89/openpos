@@ -148,25 +148,35 @@ if(!class_exists('OP_Table'))
         }
         public function tables($warehouse_id = -1,$is_front = false ){
             $result = array();
+
             if($warehouse_id >= 0)
             {
-                $posts = get_posts([
-                    'post_type' => $this->_post_type,
-                    'post_status' => array('publish'),
-                    'numberposts' => -1,
-                    'order'     => 'ASC',
-                    'meta_key' => $this->_position_meta_key,
-                    'orderby'   => 'meta_value_num'
-                ]);
-
-                foreach($posts as $p)
+                $cache_key = 'op_tables_'.$warehouse_id;
+                $cache_group = $this->_cache_group;
+                $cached_data = wp_cache_get( $cache_key, $cache_group );
+                if ( false !== $cached_data )
                 {
-                    $tmp = $this->get($p->ID);
-                    if($tmp['warehouse'] == $warehouse_id)
+                    $result =  $cached_data;
+                }else{
+                   
+                    $posts = get_posts([
+                        'post_type' => $this->_post_type,
+                        'post_status' => array('publish'),
+                        'numberposts' => -1,
+                        'order'     => 'ASC',
+                        'meta_key' => $this->_position_meta_key,
+                        'orderby'   => 'meta_value_num'
+                    ]);
+    
+                    foreach($posts as $p)
                     {
-                        $result[] = $tmp;
+                        $tmp = $this->get($p->ID);
+                        if($tmp['warehouse'] == $warehouse_id)
+                        {
+                            $result[] = $tmp;
+                        }
                     }
-
+                    wp_cache_set( $cache_key, $result, $cache_group );
                 }
             }else{
                 $posts = get_posts([
@@ -184,68 +194,60 @@ if(!class_exists('OP_Table'))
                 }
             }
             
+           
+
+            
+
+           
             return $result;
         }
         public function takeawayJsonTables($warehouse_id = -1 ,$takeaway_keys = [] ){
             $result = array();
-            if ($handle = opendir( $this->_bill_data_path)) {
-
-                while (false !== ($entry = readdir($handle))) {
-
-                    if ($entry != "." && $entry != ".." && strpos($entry,'takeaway') == 0) {
-
-                        if(strpos($entry,'.json') > 0)
+            $takeaways = $this->takeaways($warehouse_id);
+            $guest_takeaways = $this->guest_takeaways($warehouse_id);
+            
+            $all_takeaways = array(
+                'takeaway' => $takeaways,
+                'guest_takeaway' => $guest_takeaways
+            );
+            
+            foreach($all_takeaways as $type => $tables)
+            {
+                foreach($tables as $table_id)
+                {
+                    //$table_id = $table['id'];
+                    $key = implode('-',array($type,$table_id));
+                    if(!empty($takeaway_keys) && (!in_array($table_id,$takeaway_keys) && !in_array($key,$takeaway_keys)))
+                    {
+                        continue;
+                    }
+                    $table_data = $this->get_data($table_id,$type,$warehouse_id);
+                    
+                    if($table_data)
+                    {
+                        $result_table = $table_data;
+                        if(isset($result_table['online_ver']) )
                         {
-                            $table_id = str_replace('.json','',$entry);
-                            $file_path = $this->_bill_data_path.'/'.$entry;
 
-                            if(!empty($takeaway_keys) && !in_array($table_id,$takeaway_keys))
-                            {
-                                continue;
-                            }
-
-                            $file_removing_path = $this->generate_removing_file_path($entry,$warehouse_id);
-                            
-                            if(file_exists($file_removing_path))
-                            {
-                                continue;
-                            }
-
-
-                            $data = $this->_filesystem->get_contents($file_path);
-                           
-                            if($data)
-                            {
-                                $result_table = json_decode($data,true);
-                               
-
-                                if(isset($result_table['online_ver']) )
-                                {
-
-                                    $result_table['online_ver'] = max($result_table['ver'],$result_table['online_ver']);
-                                }
-                                if(!isset($result_table['desk']))
-                                {
-                                    continue;
-                                }
-                                $desk = $result_table['desk'];
-
-                                if(isset($desk['warehouse_id']))
-                                {
-                                    
-                                    if(  $warehouse_id >= 0 && $desk['warehouse_id'] != $warehouse_id)
-                                    {
-                                        continue;
-                                    }
-                                    $result[] =  $result_table;
-                                }
-
-
-                            }
+                            $result_table['online_ver'] = max($result_table['ver'],$result_table['online_ver']);
                         }
+                        if(!isset($result_table['desk']))
+                        {
+                            continue;
+                        }
+                        $desk = $result_table['desk'];
+
+                        if(isset($desk['warehouse_id']))
+                        {
+                            if(  $warehouse_id >= 0 && $desk['warehouse_id'] != $warehouse_id)
+                            {
+                                continue;
+                            }
+                            $result[] =  $result_table;
+                        }
+
                     }
                 }
-                closedir($handle);
             }
 
             return $result;
@@ -253,77 +255,79 @@ if(!class_exists('OP_Table'))
         public function takeawayTables($warehouse_id = -1 ){
 
             $result = array();
-            if ($handle = opendir( $this->_bill_data_path)) {
+            $takeaways = $this->takeaways($warehouse_id);
+            $guest_takeaways = $this->guest_takeaways($warehouse_id);
 
-                while (false !== ($entry = readdir($handle))) {
+            $all_takeaways = array(
+                'takeaway' => $takeaways,
+                'guest_takeaway' => $guest_takeaways
+            );
 
-                    if ($entry != "." && $entry != ".." && strpos($entry,'takeaway') == 0) {
+           
 
-                        if(strpos($entry,'.json') > 0)
+            foreach($all_takeaways as $type => $tables)
+            {
+                foreach($tables as $table)
+                {
+                    $table_id = isset($table['id']) ? $table['id'] : 0;
+                    $table_data = array();
+                    if($table_id)
+                    {
+                        $table_data = $this->get_data($table_id,$type,$warehouse_id);
+                    }
+                    
+                    if(!empty($table_data))
+                    {
+                        
+                        $result_table = $table_data;
+                               
+                        if(!isset($result_table['desk']))
                         {
-                            $table_id = str_replace('.json','',$entry);
-                            $file_path = $this->_bill_data_path.'/'.$entry;
+                            continue;
+                        }
+                        $desk = $result_table['desk'];
+                        
 
-                            $file_removing_path = $this->generate_removing_file_path($entry,$warehouse_id);
-                            if(file_exists($file_removing_path))
+                        if(isset($desk['warehouse_id']))
+                        {
+                            if(  $warehouse_id >= 0 && $desk['warehouse_id'] != $warehouse_id)
                             {
                                 continue;
                             }
-
-
-                            $data = $this->_filesystem->get_contents($file_path);
-                            
-                            if($data)
+                            $table_name = $desk['name'];
+                            if(isset($result_table['label']) && $result_table['label'] != null )
                             {
-                                $result_table = json_decode($data,true);
-                               
-                                if(!isset($result_table['desk']))
-                                {
-                                    continue;
-                                }
-                                $desk = $result_table['desk'];
-                                
-
-                                if(isset($desk['warehouse_id']))
-                                {
-                                    if(  $warehouse_id >= 0 && $desk['warehouse_id'] != $warehouse_id)
-                                    {
-                                        continue;
-                                    }
-                                    $table_name = $desk['name'];
-                                    if(isset($result_table['label']) && $result_table['label'] != null )
-                                    {
-                                        $table_name = $result_table['label'];
-                                    }
-                                    $result[] = array(
-                                        'id' => $desk['id'],
-                                        'name' => $table_name,
-                                        'warehouse' => $desk['warehouse_id'],
-                                        'position' => 0,
-                                        'status' => 'publish',
-                                        'dine_type' => 'takeaway',
-                                    );
-                                }
-
-
+                                $table_name = $result_table['label'];
                             }
+                            $result[] = array(
+                                'id' => $desk['id'],
+                                'name' => $table_name,
+                                'warehouse' => $desk['warehouse_id'],
+                                'position' => 0,
+                                'status' => 'publish',
+                                'dine_type' => 'takeaway',
+                            );
                         }
                     }
                 }
-                closedir($handle);
-            }
+            }   
 
             return $result;
           
 
         }
         public function delete($id){
-            $post = get_post($id);
-            if($post->post_type == $this->_post_type)
+            $table = $this->get($id);
+            if($table && !empty($table))
             {
                 wp_trash_post( $id  );
             }
+
             $cache_key = 'op_table_'.$id;
+            wp_cache_delete($cache_key, $this->_cache_group );
+
+            $warehouse_id = $table['warehouse'];
+            $cache_key = 'op_tables_'.$warehouse_id;
             wp_cache_delete($cache_key, $this->_cache_group );
         }
         public function save($params){
@@ -348,6 +352,10 @@ if(!class_exists('OP_Table'))
                 'post_parent' => $warehouse_id
             );
             $post_id = wp_insert_post($args);
+
+            $cache_key = 'op_tables_'.$warehouse_id;
+            wp_cache_delete($cache_key, $this->_cache_group );
+
             if(!is_wp_error($post_id)){
 
 
@@ -450,22 +458,31 @@ if(!class_exists('OP_Table'))
             return  apply_filters('op_table_details',$result,$is_front);;
         }
 
-        public function update_bill_screen($tables_data,$is_purge = false){
+        public function update_bill_screen($tables_data,$is_purge = false,$source = ''){
             $result = array();
             if(!empty($tables_data))
             {
                 $allow_update_kitchen = false;
                 $outlet_id = -1;
-                $server_time = time();
+                $server_time = time()*1000;// in miliseconds
+                if($source == 'background')
+                {
+                    $is_purge = true;
+                }
+                
+
                 foreach($tables_data as $table_key => $table_data)
                 {
-                    $table_type = isset($table_data['type']) ? $table_data['type'] : '';
-                    
+                    $table_type = 'dine_in';
                     $table_id = str_replace('desk-','',$table_key);
-                    if(strpos($table_id,'takeaway') === false && $table_type == 'guest_takeaway')
+                    $_table_id = $table_data['id'] ? $table_data['id']: $table_id;
+                    if(strpos($table_id,'takeaway') !== false )
                     {
+                        $table_type = 'takeaway';
                         if(!isset($table_data['id']) || !$table_data['id'])
                         {
+                            
+                            $_table_id = $table_id;
                             $table_data['id'] = $table_id;
                             $table_data['order_number'] = $table_id;
                             $table_data['source'] = 'desk_takeaway';
@@ -473,13 +490,17 @@ if(!class_exists('OP_Table'))
                             $table_data['type'] = 'takeaway';
                         }
                         $table_id = 'takeaway-'.$table_id;
+                        if(strpos($table_id,'guest_takeaway') !== false )
+                        {
+                                $table_type = 'guest_takeaway';
+                        }
                         if($table_type == 'guest_takeaway')
                         {
                         	$table_data['order_number'] = $table_data['id'];
                         }
                     }
-                    $current_data = $this->bill_screen_data($table_id);
                     
+                    $current_data = $this->get_data($_table_id,$table_type);
                     
                     $desk = isset($table_data['desk']) ? $table_data['desk'] : array();
                     
@@ -489,21 +510,24 @@ if(!class_exists('OP_Table'))
                         if($outlet_id == -1){
                             $outlet_id = isset($desk['warehouse_id']) ? $desk['warehouse_id'] : 0;    
                          }
+                    }else{
+                        $is_purge = true;
                     }
                     
                     
                     $allow_update = true;
-                    $table_online_version = isset($table_data['system_ver']) ? $table_data['system_ver'] : 0;
-                    $current_table_online_version = isset($current_data['system_ver']) ? $current_data['system_ver'] : 0;
+                    $table_sys_version = isset($table_data['system_ver']) ? $table_data['system_ver'] : 0;
+                    $current_sys_version = isset($current_data['system_ver']) ? $current_data['system_ver'] : 0;
+                    
 
                     if($is_purge)
                     {
                         $allow_update = true;
                     }else{
-                        if($table_online_version < $current_table_online_version)
+                        if($table_sys_version < $current_sys_version)
                         { 
     
-                            throw new Exception(__('There are an other update of this table. Please refresh this table and try again.','openpos'));
+                            throw new Exception(__('There are an other update of this table. Please refresh this table and try again. new:'.$table_sys_version .'- old:'. $current_sys_version,'openpos'));
                         }
                         if(isset($current_data['ver']) && isset($table_data['ver']))
                         {
@@ -513,77 +537,40 @@ if(!class_exists('OP_Table'))
                             }
     
                         }
+                        
                     }
                     
-                    if(!$table_online_version)
-                    {
-                        $table_data['system_ver'] = 0;
-                    }
+                   
                     $_table_data = apply_filters('op_update_table_data',$table_data,$current_data);
                     
                     $_allow_update = apply_filters('op_get_allow_update_table_data',$allow_update,$table_data,$current_data);
                     $result[$table_key] = $current_data;
                     if($_allow_update)
                     {
-                       
-                        $_table_data['system_ver'] = $server_time;
-
-                        $allow_update_kitchen = true;
-                        $register_file = $this->bill_screen_file_path($table_id);
-                        if(file_exists($register_file))
+                        if($source != 'background')
                         {
-                            $this->_filesystem->delete($register_file);
+                            $_table_data['system_ver'] =  $server_time;
                         }
-
-                        $file_mode = $this->get_file_mode();
-                        $this->_filesystem->put_contents(
-                            $register_file,
-                            json_encode($_table_data),
-                            $file_mode // predefined mode settings for WP files
-                        );
+                        $allow_update_kitchen = true;
+                        
+                        $this->update_data($_table_data,$_table_id,$table_type,$outlet_id);
+                        
                         $result[$table_key] = $_table_data;
                     }
-                    if($outlet_id  >= 0 && $allow_update_kitchen )
-                    {
-                       
-                        $this->update_kitchen_data($outlet_id);
-                    }
-
+                   
                 }
+                if($outlet_id  >= 0 && $allow_update_kitchen )
+                {
+                     
+                    $this->update_kitchen_data($outlet_id);
+                }
+
             }
             return $result;
         }
         public function update_table_bill_screen($table_id,$table_data,$table_type = 'dine_in'){ //use for update message guest update from kitchen only
-            if($table_type != 'dine_in')
-            {
-                $table_id = $table_type.'-'.$table_id;
-            }
-            $register_file = $this->bill_screen_file_path($table_id);
-            $file_mode = $this->get_file_mode() ;
-            
-            if(file_exists($register_file))
-            {
-                if ( defined( 'FS_CHMOD_FILE' ) ) {
-                    $this->_filesystem->put_contents(
-                        $register_file,
-                        json_encode($table_data)
-                    );
-                }else{
-                    $this->_filesystem->put_contents(
-                        $register_file,
-                        json_encode($table_data),
-                        $file_mode
-                    );
-                }
-                
-            }else{
-                
-                $this->_filesystem->put_contents(
-                    $register_file,
-                    json_encode($table_data),
-                    $file_mode // predefined mode settings for WP files
-                );
-            }
+           
+            $this->update_data($table_data,$table_id,$table_type);
             $desk = isset($table_data['desk']) ? $table_data['desk'] : array();
                     
             if(!empty($desk))
@@ -592,8 +579,7 @@ if(!class_exists('OP_Table'))
 
                 if($outlet_id == -1){
                     $outlet_id = isset($desk['warehouse_id']) ? $desk['warehouse_id'] : 0;    
-                 }
-
+                }
                 $this->update_kitchen_data($outlet_id);
             }
             
@@ -609,7 +595,7 @@ if(!class_exists('OP_Table'))
             $url = ltrim($url,'/');
             return $url.'/openpos/tables/'.$table_id.'.json';
         }
-        public function bill_screen_data($table_id,$type='dine_in')
+        private function _bill_screen_data($table_id,$type='dine_in')
         {
             if($type != 'dine_in')
             {
@@ -648,102 +634,8 @@ if(!class_exists('OP_Table'))
                 return $result;
             }
         }
-        public function tables_version($warehouse_id = -1){
-            $result = array();
-            if ($handle = opendir( $this->_bill_data_path)) {
-
-                while (false !== ($entry = readdir($handle))) {
-
-                    if ($entry != "." && $entry != "..") {
-
-                        if(strpos($entry,'.json') > 0)
-                        {
-                            $table_id = str_replace('.json','',$entry);
-                            $file_path = $this->_bill_data_path.'/'.$entry;
-                            $data = $this->_filesystem->get_contents($file_path);
-                            if($data)
-                            {
-                                $result_table = json_decode($data,true);
-                                if($warehouse_id >= 0)
-                                {
-
-                                    if( isset($result_table['desk']['warehouse_id']) && $result_table['desk']['warehouse_id'] != $warehouse_id ){
-                                        continue;
-                                    }
-                                }
-                               
-                                $version = isset($result_table['ver']) ? $result_table['ver'] : 0;
-                                $result[$table_id] = $version;
-                            }
-                        }
-                    }
-                }
-                closedir($handle);
-            }
-            return $result;
-        }
-        public function ready_dishes($warehouse_id = -1){
-            $result = array();
-            if ($handle = opendir( $this->_bill_data_path)) {
-
-                while (false !== ($entry = readdir($handle))) {
-
-                    if ($entry != "." && $entry != "..") {
-                        $table_type = 'dine_in';
-
-                        if(strpos($entry,'takeaway') === 0)
-                        {
-                            $table_type = 'takeaway';
-                        }
-                        if(strpos($entry,'.json') > 0)
-                        {
-                            $table_id = str_replace('.json','',$entry);
-                            $file_path = $this->_bill_data_path.'/'.$entry;
-                            $data = $this->_filesystem->get_contents($file_path);
-                            if($data)
-                            {
-                                $result_table = json_decode($data,true);
-                                $desk = isset($result_table['desk']) ? $result_table['desk'] : array();
-                                if(isset($desk['warehouse_id']) && $desk['warehouse_id'] != $warehouse_id && $warehouse_id >= 0)
-                                {
-                                    continue;
-                                }
-                                $items = isset($result_table['items']) ? $result_table['items'] : array();
-                                if(!empty($items))
-                                {
-                                    $table = isset($result_table['desk']) ? $result_table['desk'] : [];
-                                    $table_name = isset($table['name']) ? $table['name'] : '';
-                                    $table_id = isset($table['id']) ? $table['id'] : 0;
-                                    foreach ($items as $_item)
-                                    {
-                                        if(isset($_item['done']) && $_item['done'] == 'ready')
-                                        {
-                                            $item_dinning = isset($_item['dining']) ? $_item['dining'] : $table_type;
-                                            if(!$item_dinning)
-                                            {
-                                                $item_dinning = 'dine_in';
-                                            }
-                                            $result[] = array(
-                                                'id' => $_item['id'],
-                                                'table_id' => $table_id,
-                                                'table_name' => $table_name,
-                                                'table_type' => $table_type,
-                                                'item_dinning' => $item_dinning,
-                                                'item_name' => $_item['qty'].' x '.$_item['name']
-                                            );
-                                        }
-                                    }
-
-                                }
-
-                            }
-                        }
-                    }
-                }
-                closedir($handle);
-            }
-            return $result;
-        }
+        
+       
         function generate_removing_file_path($file_name,$outlet_id = 0){
             $process_name = 'removing_';
             $process_name .= $file_name;
@@ -759,113 +651,66 @@ if(!class_exists('OP_Table'))
             return $this->_bill_data_path_deleted.'/'.$outlet_id.'/'.$process_name;
         }
         public function removeJsonTable($table_id,$force = false){
-
-            $file_path = $this->bill_screen_file_path($table_id);
-            
-            if($force)
+            $table_type = 'dine_in';
+            $_table_id = str_replace('desk-','',$table_id);
+            $table_key = $table_id;
+            if(strpos($table_id,'takeaway') !== false )
             {
-                $file_path = $this->_bill_data_path.'/takeaway-'.$table_id.'.json';
+                $_table_id = str_replace('takeaway-','',$table_id);
+                $table_type = 'takeaway';
+                $table_key = 'takeaway-'.$_table_id;
             }
-           
-            if(file_exists($file_path))
+            $table_data = $this->get_data($table_id,$table_type);
+            
+            
+            $desk = isset($table_data['desk']) ? $table_data['desk'] : array();
+            $outlet_id = -1;
+            if(!empty($desk))
             {
-                if($force)
-                {
-                    $table_data = $this->bill_screen_data($table_id,'takeaway');
-                }else{
-                    $table_data = $this->bill_screen_data($table_id);
-                }
-               
-                
-                $desk = isset($table_data['desk']) ? $table_data['desk'] : array();
-                $outlet_id = -1;
-                if(!empty($desk))
-                {
-                    $outlet_id = isset($desk['warehouse']) ? $desk['warehouse'] : -1;
-                    if($outlet_id == -1){
-                        $outlet_id = isset($desk['warehouse_id']) ? $desk['warehouse_id'] : 0;    
-                     }
-                }
-
-                do_action('op_remove_json_table_before',$table_data,$outlet_id);
-
-                //create dump file
-                $process_name = basename($file_path);
-                $process_path = $this->generate_removing_file_path($process_name,$outlet_id);
-                
-                
-                // $file_mode = $this->get_file_mode();
-                // $this->_filesystem->put_contents(
-                //     $process_path,
-                //     '',
-                //     $file_mode // predefined mode settings for WP files
-                // );
-                // end dump file
-                
-                rename($file_path, $process_path);
-                if($outlet_id >= 0)
-                {
-                    $this->update_kitchen_data($outlet_id);
-                }
-
+                $outlet_id = isset($desk['warehouse']) ? $desk['warehouse'] : -1;
+                if($outlet_id == -1){
+                    $outlet_id = isset($desk['warehouse_id']) ? $desk['warehouse_id'] : 0;    
+                    }
             }
-            
-            
+
+            do_action('op_remove_json_table_before',$table_data,$outlet_id);
+
+            $this->remove_data($_table_id,$table_type);
+
+            if($outlet_id >= 0)
+            {
+                $this->update_kitchen_data($outlet_id);
+            }
         }
-        public function clear_takeaway($warehouse_id = -1 ){
+        public function clear_all_data($warehouse_id = -1 ){
             $result = array();
             
            
             if($warehouse_id >= 0)
             {
                 $tables = $this->tables($warehouse_id);
+                $takeaways = $this->takeaways($warehouse_id);
+                $guest_takeaways = $this->guest_takeaways($warehouse_id);
                 
                 $exist_tables = array();
                 foreach($tables as $t)
                 {
-                    $exist_tables[] = $t['id'];
+                    //$exist_tables[] = $t['id'];
+                    $this->remove_data($t['id'],'dine_in');
                 }
-                if ($handle = opendir( $this->_bill_data_path)) {
-    
-                    while (false !== ($entry = readdir($handle))) {
-    
-                        if ($entry != "." && $entry != "..") {
-    
-                            if(strpos($entry,'.json') > 0)
-                            {
-                                $is_delete = false;
-                                $file_path = $this->_bill_data_path.'/'.$entry;
-                                $process_path = $this->generate_removing_file_path($entry,$warehouse_id);
-
-                                
-                                $data = $this->_filesystem->get_contents($file_path);
-                                if($data)
-                                {
-                                    $result_table = json_decode($data,true);
-                                    
-                                    
-                                    if( isset($result_table['desk']['warehouse_id']) && $result_table['desk']['warehouse_id'] != $warehouse_id ){
-                                        continue;
-                                    }
-                                }
-
-                                if(strpos($entry,'takeaway') !== false)
-                                {
-                                    $is_delete = true;
-                                }else{
-                                    if( ! isset($result_table['desk']['id']) && !in_array($result_table['desk']['id'],$exist_tables) ){
-                                        $is_delete = true; // deleted abandone desk
-                                    }
-                                }
-                                if($is_delete)
-                                {
-                                    unlink($file_path);
-                                }
-                            }
-                        }
-                    }
-                    closedir($handle);
+                foreach($takeaways as $t)
+                {
+                    $this->remove_data($t,'takeaway');
+                    
                 }
+                
+                foreach($guest_takeaways as $t)
+                {
+                    $this->remove_data($t,'guest_takeaway');
+                }
+                $this->remove_all_takeaway($warehouse_id);
+                $this->remove_all_takeaway($warehouse_id,true);
+                
                 
                 $this->update_kitchen_data($warehouse_id);
             }
@@ -931,7 +776,7 @@ if(!class_exists('OP_Table'))
             }
         }
         public function addMessage($table_id,$messages = array()){
-            $table_data = $this->bill_screen_data($table_id);
+            $table_data = $this->get_data($table_id);
             $table_data['messages'] = $messages;
             try{
                 $this->update_table_bill_screen($table_id,$table_data);
@@ -942,7 +787,7 @@ if(!class_exists('OP_Table'))
             }
         }
         public function getMessages($table_id){
-            $table_data = $this->bill_screen_data($table_id);
+            $table_data = $this->get_data($table_id);
             
             $result = array();
             if(isset($table_data['messages']) &&  !empty($table_data['messages']))
@@ -961,7 +806,7 @@ if(!class_exists('OP_Table'))
             return $result;
         }
         public function clearMessages($table_id){
-            $table_data = $this->bill_screen_data($table_id);
+            $table_data = $this->get_data($table_id);
             $table_data['messages'] = array();
             try{
                 $this->update_table_bill_screen($table_id,$table_data);
@@ -976,21 +821,20 @@ if(!class_exists('OP_Table'))
             $message = false;//sprintf( __('You have new message from table %s','openpos'),'ngoai troi');
             return $message;
         }
-        public function get_all_update_data($warehouse_id,$time_stamp = 0,$time_stamp_utc = 0)
+        public function get_all_update_data($request_takeaway = array(),$warehouse_id=0,$time_stamp = 0,$time_stamp_utc = 0)
         {
-            //$tables_version = $op_table->tables_version($warehouse_id);
-            //$ready_dish = $op_table->ready_dishes($warehouse_id);
+            
             $tables = $this->tables($warehouse_id);
+            $takeaways = $this->takeaways($warehouse_id);
+            $guest_takeaways = $this->guest_takeaways($warehouse_id);
 
             $table_ids = array();
             foreach($tables as $t)
             {
                 $table_ids[] = $t['id'];
             }
-           
-            
 
-            $request_takeaway = isset($_REQUEST['takeaway']) ?  json_decode(stripslashes($_REQUEST['takeaway']),true) : array();
+            //$request_takeaway = isset($_REQUEST['takeaway']) ?  json_decode(stripslashes($_REQUEST['takeaway']),true) : array();
             
 
             $tables_version = array();
@@ -998,117 +842,93 @@ if(!class_exists('OP_Table'))
             $desk_message = array();
             $deleted_takeaway = array();
             
-            if ($handle = opendir( $this->_bill_data_path)) {
+            $all_tables = array(
+                'dine_in' => $table_ids,
+                'takeaway' => $takeaways,
+                'guest_takeaway' => $guest_takeaways,
+            );
 
-                while (false !== ($entry = readdir($handle))) {
-
-                    if ($entry != "." && $entry != "..") {
-
-                        if(strpos($entry,'.json') > 0)
+            foreach($all_tables as $table_type => $table_list)
+            {
+                foreach($table_list as $t)
+                {
+                    $data =  $this->get_data($t,$table_type,$warehouse_id);
+                    if($data)
+                    {
+                        $result_table = $data;
+                        if($warehouse_id >= 0)
                         {
-                            $table_id = str_replace('.json','',$entry);
-                            $allow = in_array($table_id,$table_ids);
-                            $table_type = 'dine_in';
-                            if(!$allow && strpos($entry,'takeaway') === 0)
-                            {
-                                $table_type = 'takeaway';
-                                $allow = true;
-
-
-                                $filename = $entry;
-                                $deleted_path = $this->generate_removing_file_path($filename,$warehouse_id);
-                                if(file_exists($deleted_path))
-                                {
-                                    $allow = false;
-                                }
-
+                            if( isset($result_table['desk']['warehouse_id']) && $result_table['desk']['warehouse_id'] != $warehouse_id ){
+                                continue;
                             }
-
-                            if($allow)
-                            {
-                                $file_path = $this->_bill_data_path.'/'.$entry;
-                                $data = $this->_filesystem->get_contents($file_path);
-                                if($data)
-                                {
-                                    $result_table = json_decode($data,true);
-                                    if($warehouse_id >= 0)
-                                    {
-    
-                                        if( isset($result_table['desk']['warehouse_id']) && $result_table['desk']['warehouse_id'] != $warehouse_id ){
-                                            continue;
-                                        }
-                                    }
-                                    //table version
-                                    $version = isset($result_table['ver']) ? $result_table['ver'] : 0;
-                                    $tables_version[$table_id] = $version;
-
-
-                                    //ready item
-                                    $items = isset($result_table['items']) ? $result_table['items'] : array();
-                                    $table = isset($result_table['desk']) ? $result_table['desk'] : [];
-                                    $table_name = isset($table['name']) ? $table['name'] : '';
-                                    $table_id = isset($table['id']) ? $table['id'] : 0;
-                                    if(!empty($items))
-                                    {
-                                        foreach ($items as $_item)
-                                        {
-                                            if(isset($_item['done']) && $_item['done'] == 'ready')
-                                            {
-                                                $item_dinning = isset($_item['dining']) ? $_item['dining'] : $table_type;
-                                                if(!$item_dinning)
-                                                {
-                                                    $item_dinning = 'dine_in';
-                                                }
-                                                $ready_dish[] = array(
-                                                    'id' => $_item['id'],
-                                                    'table_id' => $table_id,
-                                                    'table_name' => $table_name,
-                                                    'table_type' => $table_type,
-                                                    'item_dinning' => $item_dinning,
-                                                    'item_name' => $_item['qty'].' x '.$_item['name']
-                                                );
-                                            }
-                                        }
-
-                                    }
-                                    //desk messages
-                                    $messages = isset($result_table['messages']) ? $result_table['messages'] : array();
-                                    $new_messages = array();
-                                    if(!empty($messages))
-                                    {
-                                        foreach($messages as $time_utc => $content)
-                                        {
-                                            if($time_stamp_utc < $time_utc)
-                                            {
-                                                $new_messages[] = $content;
-                                            }
-                                        }
-                                    }
-                                    if(!empty($new_messages))
-                                    {
-                                        $desk_message[] = $table_name;
-                                    }
-
-                                }
-                            }
-                            
                         }
+                        //table version
+                        $version = isset($result_table['system_ver']) ? $result_table['system_ver'] : 0;
+
+                        $table_key = $t;
+                        if($table_type != 'dine_in')
+                        {
+                            $table_key = implode('-',array($table_type,$t));
+                        }
+                       
+                        $tables_version[$table_key] = 1*$version;
+
+
+                        //ready item
+                        $items = isset($result_table['items']) ? $result_table['items'] : array();
+                        $table = isset($result_table['desk']) ? $result_table['desk'] : [];
+                        $table_name = isset($table['name']) ? $table['name'] : '';
+                        $table_id = isset($table['id']) ? $table['id'] : 0;
+                        if(!empty($items))
+                        {
+                            foreach ($items as $_item)
+                            {
+                                if(isset($_item['done']) && $_item['done'] == 'ready')
+                                {
+                                    $item_dinning = isset($_item['dining']) ? $_item['dining'] : $table_type;
+                                    if(!$item_dinning)
+                                    {
+                                        $item_dinning = 'dine_in';
+                                    }
+                                    $ready_dish[] = array(
+                                        'id' => $_item['id'],
+                                        'table_id' => $table_id,
+                                        'table_name' => $table_name,
+                                        'table_type' => $table_type,
+                                        'item_dinning' => $item_dinning,
+                                        'item_name' => $_item['qty'].' x '.$_item['name']
+                                    );
+                                }
+                            }
+
+                        }
+                        //desk messages
+                        $messages = isset($result_table['messages']) ? $result_table['messages'] : array();
+                        $new_messages = array();
+                        if(!empty($messages))
+                        {
+                            foreach($messages as $time_utc => $content)
+                            {
+                                if($time_stamp_utc < $time_utc)
+                                {
+                                    $new_messages[] = $content;
+                                }
+                            }
+                        }
+                        if(!empty($new_messages))
+                        {
+                            $desk_message[] = $table_name;
+                        }
+
                     }
                 }
-                closedir($handle);
-            }
-
-           
-
+            }             
             foreach($request_takeaway as $takeaway_id)
             {
-                $filename = 'takeaway-'.$takeaway_id.'.json';
-                $deleted_path = $this->generate_removing_file_path($filename,$warehouse_id);
-                if(file_exists($deleted_path))
+                if($this->is_deleted($takeaway_id,'takeaway',$warehouse_id))
                 {
                     $deleted_takeaway[] = $takeaway_id;
                 }
-
             }
             $result = array(
                 'tables_version' => $tables_version,
@@ -1126,13 +946,22 @@ if(!class_exists('OP_Table'))
             $upload_dir = wp_upload_dir();
             $url = $upload_dir['baseurl'];
             $url = ltrim($url,'/');
-            return $url.'/openpos/kitchen/'.$outlet_id.'.json';
+            return get_rest_url(null,'/op/v1/kitchen/'.$outlet_id);
+            //return $url.'/openpos/kitchen/'.$outlet_id.'.json';
+        }
+        public function kitchen_data_path($outlet_id = 0){
+            return $this->_kitchen_data_path.'/'.$outlet_id.'.json';;
         }
        
         public function update_kitchen_data($outlet_id = 0)
         {
             global $op_woo;
             $warehouse_id = $outlet_id;
+            $cache_group = 'openpos';
+            $cache_key = 'op_kitchen_'.$outlet_id;
+
+            wp_cache_delete($cache_key, $cache_group );
+
             $result = array();
             $result_formated = array();
 
@@ -1154,160 +983,172 @@ if(!class_exists('OP_Table'))
             if($warehouse_id >= 0)
             {
                 $off_tables = $this->tables((int)$warehouse_id);
-                $takeaway_tables = $this->takeawayTables((int)$warehouse_id);
-                $tables = array_merge($off_tables,$takeaway_tables);
-
-                foreach($tables as $table)
+                $takeaway_tables =  $this->takeaways((int)$warehouse_id);// $this->takeawayTables((int)$warehouse_id);
+                $guest_takeaways =  $this->guest_takeaways((int)$warehouse_id);
+                $tables = array(
+                    'dine_in' => $off_tables,
+                    'takeaway' => $takeaway_tables,
+                    'guest_takeaway' => $guest_takeaways
+                );
+            
+                foreach($tables as $table_type => $_tables)
                 {
-
-                    $table_type = isset($table['dine_type'])? $table['dine_type'] :'dine_in';
-                
-                    $table_data = $this->bill_screen_data($table['id'],$table_type);
                     
-                    
-                    if(isset($table_data['parent']) && $table_data['parent'] == 0 && isset($table_data['items'])  && count($table_data['items']) > 0)
+                    foreach($_tables as $table)
                     {
-                        $items = $table_data['items'];
-                        $formatted_items = array();
-                        $is_full_serverd = true;
-                        $last_order_timestamp = 0;
-                        
-                        foreach($items as $key => $item)
+                        if($table_type == 'dine_in')
                         {
-                            $id = 1 * $item['id'];
-
-                            if($id > $last_order_timestamp)
-                            {
-                                $last_order_timestamp = $id;
-                            }
-                            $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
-
+                            $table_data = $this->get_data($table['id'],$table_type,$warehouse_id);
+                           
+                        }else{
+                            $table_data = $this->get_data($table,$table_type,$warehouse_id);
+                        }
+                        if(isset($table_data['parent']) && $table_data['parent'] == 0 && isset($table_data['items'])  && count($table_data['items']) > 0)
+                        {
+                            $items = $table_data['items'];
+                            $formatted_items = array();
+                            $is_full_serverd = true;
+                            $last_order_timestamp = 0;
                             
-
-                            if(isset($item['done']) && ($item['done'] == 'done' || $item['done'] == 'done_all'))
+                            foreach($items as $key => $item)
                             {
-                                 continue;
-                            }else{
-                                $is_full_serverd = false;
-                                $timestamp = (int)($item['id'] / 1000);
-                                if(isset($item['order_time']) && $item['order_time'] > 100)
-                                {
-                                   if(is_numeric($item['order_time']))
-                                   {
-                                        $timestamp = (1*($item['order_time']) / 1000);
-                                   }
-                                   
-                                }
-                                if(isset($item['order_timestamp']) && $item['order_timestamp'] > 100)
-                                {
-                                   if(is_numeric($item['order_timestamp']))
-                                   {
-                                        $timestamp = (1*($item['order_timestamp']) / 1000);
-                                   }
-                                   
-                                }
-                                $order_timestamp = $timestamp  * 1000;
+                                $id = 1 * $item['id'];
 
-                                $timestamp += wc_timezone_offset();
+                                if($id > $last_order_timestamp)
+                                {
+                                    $last_order_timestamp = $id;
+                                }
+                                $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
 
-                                $order_time = '--:--';
-                                if($timestamp)
-                                {
-                                    $order_time = date('d-m-y  h:i',$timestamp);
-                                }
-                                $dish_id = $id.'-'.$table['id'];
-                                if($table_type && $table_type != 'dine_in')
-                                {
-                                    $dish_id.= '-'.$table_type;
-                                }
-                                $item_note = $item['sub_name'];
-                                $order_note = '';
-                                if(isset($table_data['note']) && $table_data['note'])
-                                {
-                                    $order_note = $table_data['note'];
-                                }
-                                $item_kitchen_area = array();
+                                
 
-                                foreach($all_area as $a => $area)
+                                if(isset($item['done']) && ($item['done'] == 'done' || $item['done'] == 'done_all'))
                                 {
-                                    if($product_id)
+                                    continue;
+                                }else{
+                                    $is_full_serverd = false;
+                                    $timestamp = (int)($item['id'] / 1000);
+                                    if(isset($item['order_time']) && $item['order_time'] > 100)
                                     {
-                                        if($op_woo->check_product_kitchen_op_type($a,$product_id,$item)){
-                                            $item_kitchen_area[] = $a;
+                                    if(is_numeric($item['order_time']))
+                                    {
+                                            $timestamp = (1*($item['order_time']) / 1000);
+                                    }
+                                    
+                                    }
+                                    if(isset($item['order_timestamp']) && $item['order_timestamp'] > 100)
+                                    {
+                                    if(is_numeric($item['order_timestamp']))
+                                    {
+                                            $timestamp = (1*($item['order_timestamp']) / 1000);
+                                    }
+                                    
+                                    }
+                                    $order_timestamp = $timestamp  * 1000;
+
+                                    $timestamp += wc_timezone_offset();
+
+                                    $order_time = '--:--';
+                                    if($timestamp)
+                                    {
+                                        $order_time = date('d-m-y  h:i',$timestamp);
+                                    }
+                                    $dish_id = $id.'-'.$table['id'];
+                                    if($table_type && $table_type != 'dine_in')
+                                    {
+                                        $dish_id.= '-'.$table_type;
+                                    }
+                                    $item_note = $item['sub_name'];
+                                    $order_note = '';
+                                    if(isset($table_data['note']) && $table_data['note'])
+                                    {
+                                        $order_note = $table_data['note'];
+                                    }
+                                    $item_kitchen_area = array();
+
+                                    foreach($all_area as $a => $area)
+                                    {
+                                        if($product_id)
+                                        {
+                                            if($op_woo->check_product_kitchen_op_type($a,$product_id,$item)){
+                                                $item_kitchen_area[] = $a;
+                                            }
+                                        }
+                                    }
+
+
+                                    $tmp = array(
+                                        'id' => $dish_id,
+                                        'local_id' => $id ,
+                                        'priority' => 1,
+                                        'item' => $item['name'],
+                                        'seller_name' => $item['seller_name'] ? $item['seller_name'] : '',
+                                        'qty' => $item['qty'],
+                                        'table' => $table['name'],
+                                        'order_time' => $order_time,
+                                        'order_timestamp' => $order_timestamp,
+                                        'note' => $item_note,
+                                        'order_note' => $order_note,
+                                        'dining' => isset($item['dining']) ? $item['dining'] : '',
+                                        'done' => isset($item['done']) ? $item['done'] : '',
+                                        'allow_action' => array(),
+                                        'kitchen_area' => $item_kitchen_area,
+                                    );
+                                    
+                                    $dish_data = apply_filters('op_kitchen_dish_item_data',$tmp,$table_data,$item);
+                                    if($dish_data && !empty($dish_data) )
+                                    {
+                                        $result_items['all'][$id] =  $dish_data;
+                                        $formatted_items['all'][] = $dish_data;
+                                        $kitchen_area = isset($dish_data['kitchen_area']) ? $dish_data['kitchen_area'] : array();
+                                        foreach($kitchen_area as $a)
+                                        {
+                                            $result_items[$a][$id] =  $dish_data;
+                                            $formatted_items[$a][] = $dish_data;
+                                        }
+                                        $total++;
+                                    }
+                                }
+                            }
+
+                            if( !empty($formatted_items['all']) && !$is_full_serverd)
+                            {
+                                $table_data['items'] = $formatted_items['all'];
+                                $table_data['allow_action'] = array();
+                                $table_data['dining'] = isset($table_data['dining']) ? $table_data['dining'] : '';
+                                $table_data['order_timestamp'] = isset($table_data['created_at_time']) && $table_data['created_at_time'] > 100 ? $table_data['created_at_time'] : $last_order_timestamp;
+                                if($last_order_timestamp)
+                                {
+                                    if(isset($result_items['all'][$last_order_timestamp]))
+                                    {
+                                        $last_order_timestamp = $last_order_timestamp + rand(1,10);
+                                    }
+                                    $result_orders['all'][$last_order_timestamp] = apply_filters('op_kitchen_dish_table_data',$table_data);
+                                }else{
+                                    $result_orders['all'][] = apply_filters('op_kitchen_dish_table_data',$table_data);
+                                }
+                                foreach($formatted_items as $a => $area_items)
+                                {
+                                    if($a != 'all')
+                                    {
+                                        $table_data['items'] = $formatted_items[$a];
+                                        if($last_order_timestamp)
+                                        {
+                                            $result_orders[$a][$last_order_timestamp] = apply_filters('op_kitchen_dish_table_data_area',$table_data,$a);
+                                        }else{
+                                            $result_orders[$a][] = apply_filters('op_kitchen_dish_table_data_area',$table_data,$a);
                                         }
                                     }
                                 }
-
-
-                                $tmp = array(
-                                    'id' => $dish_id,
-                                    'local_id' => $id ,
-                                    'priority' => 1,
-                                    'item' => $item['name'],
-                                    'seller_name' => $item['seller_name'] ? $item['seller_name'] : '',
-                                    'qty' => $item['qty'],
-                                    'table' => $table['name'],
-                                    'order_time' => $order_time,
-                                    'order_timestamp' => $order_timestamp,
-                                    'note' => $item_note,
-                                    'order_note' => $order_note,
-                                    'dining' => isset($item['dining']) ? $item['dining'] : '',
-                                    'done' => isset($item['done']) ? $item['done'] : '',
-                                    'allow_action' => array(),
-                                    'kitchen_area' => $item_kitchen_area,
-                                );
-                                
-                                $dish_data = apply_filters('op_kitchen_dish_item_data',$tmp,$table_data,$item);
-                                if($dish_data && !empty($dish_data) )
-                                {
-                                    $result_items['all'][$id] =  $dish_data;
-                                    $formatted_items['all'][] = $dish_data;
-                                    $kitchen_area = isset($dish_data['kitchen_area']) ? $dish_data['kitchen_area'] : array();
-                                    foreach($kitchen_area as $a)
-                                    {
-                                        $result_items[$a][$id] =  $dish_data;
-                                        $formatted_items[$a][] = $dish_data;
-                                    }
-                                    $total++;
-                                }
                             }
+                            
+                            
                         }
-
-                        if( !empty($formatted_items['all']) && !$is_full_serverd)
-                        {
-                            $table_data['items'] = $formatted_items['all'];
-                            $table_data['allow_action'] = array();
-                            $table_data['dining'] = isset($table_data['dining']) ? $table_data['dining'] : '';
-                            $table_data['order_timestamp'] = isset($table_data['created_at_time']) && $table_data['created_at_time'] > 100 ? $table_data['created_at_time'] : $last_order_timestamp;
-                            if($last_order_timestamp)
-                            {
-                                if(isset($result_items['all'][$last_order_timestamp]))
-                                {
-                                    $last_order_timestamp = $last_order_timestamp + rand(1,10);
-                                }
-                                $result_orders['all'][$last_order_timestamp] = apply_filters('op_kitchen_dish_table_data',$table_data);
-                            }else{
-                                $result_orders['all'][] = apply_filters('op_kitchen_dish_table_data',$table_data);
-                            }
-                            foreach($formatted_items as $a => $area_items)
-                            {
-                                if($a != 'all')
-                                {
-                                    $table_data['items'] = $formatted_items[$a];
-                                    if($last_order_timestamp)
-                                    {
-                                        $result_orders[$a][$last_order_timestamp] = apply_filters('op_kitchen_dish_table_data_area',$table_data,$a);
-                                    }else{
-                                        $result_orders[$a][] = apply_filters('op_kitchen_dish_table_data_area',$table_data,$a);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        
                     }
                 }
             }
+
+            
             
             foreach($result_orders as $a => $_result_orders)
             {
@@ -1356,109 +1197,91 @@ if(!class_exists('OP_Table'))
             $result_formated['orders'] = $orders_formated;
             $result_formated['items'] = $items_formated;
             $kitchen_data = $result_formated;
-            $data_file = $this->_kitchen_data_path.'/'.$outlet_id.'.json';
-
+            $data_file = $this->kitchen_data_path($outlet_id);
            
             $final_kitchen_data = apply_filters('op_kitchen_tables_data',$kitchen_data,$outlet_id,$this);
             
-
             $file_mode = $this->get_file_mode();
+            
             
             $this->_filesystem->put_contents(
                 $data_file,
                 json_encode($final_kitchen_data),
                 $file_mode // predefined mode settings for WP files
             );
+            $cache_group = 'openpos';
+            $cache_key = 'op_kitchen_'.$outlet_id;
+            wp_cache_delete($cache_key, $cache_group );
         }
         public function removed_deleted_markup($warehouse_id = 0,$table_id = ''){
-            $deleted_files = array();
-            $takeaway_files = array();
-            $diff_files = array();
-            if($table_id)
-            {
+            // $deleted_files = array();
+            // $takeaway_files = array();
+            // $diff_files = array();
+            // if($table_id)
+            // {
                 
-                $file = $table_id.'.json';
-                $path = $this->generate_removing_file_path($file,$warehouse_id);
+            //     $file = $table_id.'.json';
+            //     $path = $this->generate_removing_file_path($file,$warehouse_id);
                 
-                if(file_exists($path))
-                {
-                    $diff_files[] = $file; // format takeaway_1234.json
-                }
+            //     if(file_exists($path))
+            //     {
+            //         $diff_files[] = $file; // format takeaway_1234.json
+            //     }
                 
-            }else{
-                if (file_exists($this->_bill_data_path_deleted.'/'.$warehouse_id) && $handle = opendir( $this->_bill_data_path_deleted.'/'.$warehouse_id)) {
+            // }else{
+            //     if (file_exists($this->_bill_data_path_deleted.'/'.$warehouse_id) && $handle = opendir( $this->_bill_data_path_deleted.'/'.$warehouse_id)) {
     
-                    while (false !== ($entry = readdir($handle))) {
+            //         while (false !== ($entry = readdir($handle))) {
     
-                        if ($entry != "." && $entry != "..") {
+            //             if ($entry != "." && $entry != "..") {
     
-                            if(strpos($entry,'.json') > 0)
-                            {
+            //                 if(strpos($entry,'.json') > 0)
+            //                 {
                                
-                                $deleted_files[] = str_replace('removing_','',$entry);
+            //                     $deleted_files[] = str_replace('removing_','',$entry);
                                 
-                            }
-                        }
-                    }
-                    closedir($handle);
-                }
-                if ($handle = opendir( $this->_bill_data_path)) {
+            //                 }
+            //             }
+            //         }
+            //         closedir($handle);
+            //     }
+            //     if ($handle = opendir( $this->_bill_data_path)) {
         
-                    while (false !== ($entry = readdir($handle))) {
+            //         while (false !== ($entry = readdir($handle))) {
     
-                        if ($entry != "." && $entry != "..") {
+            //             if ($entry != "." && $entry != "..") {
     
-                            if(strpos($entry,'.json') > 0)
-                            {
+            //                 if(strpos($entry,'.json') > 0)
+            //                 {
                                
-                                $takeaway_files[] = $entry;
+            //                     $takeaway_files[] = $entry;
                                 
-                            }
-                        }
-                    }
-                    closedir($handle);
-                }
+            //                 }
+            //             }
+            //         }
+            //         closedir($handle);
+            //     }
                 
-                $diff_files = array_diff($deleted_files,$takeaway_files);
-            }
+            //     $diff_files = array_diff($deleted_files,$takeaway_files);
+            // }
             
             
-            foreach($diff_files as $file)
-            {
-                $path = $this->generate_removing_file_path($file,$warehouse_id);
+            // foreach($diff_files as $file)
+            // {
+            //     $path = $this->generate_removing_file_path($file,$warehouse_id);
                 
-                unlink($path);
-            }
+            //     unlink($path);
+            // }
         }
 
         public function getLastTakeawayNumber($register_id,$warehouse_id){
             $result_number = 0;
-            
-            if ($handle = opendir( $this->_bill_data_path)) {
-
-                while (false !== ($entry = readdir($handle))) {
-
-                    if ($entry != "." && $entry != ".." && strpos($entry,'takeaway-') === 0) {
-
-                        if(strpos($entry,'.json') > 0)
-                        {
-                            $table_id = str_replace('.json','',$entry);
-                            
-                            if(strpos($table_id,'takeaway-'.$register_id) === 0){
-                                $_result_number  = 1 * str_replace('takeaway-','',$table_id);
-                                if($_result_number > $result_number)
-                                {
-                                    $result_number = $_result_number;
-                                }
-                            }
-
-                        }
-                    }
-                }
-                closedir($handle);
+            $takeaways = $this->takeaways($warehouse_id);
+            if($takeaways && !empty($takeaways))
+            {
+                return max($takeaways);
             }
             return $result_number;
-
         }
         public function getTakeawayNumber($register_id,$warehouse_id = 0){
             $takeaway_number = 1 * ($register_id . '0000');
@@ -1488,16 +1311,7 @@ if(!class_exists('OP_Table'))
             }
             return $result;
         }
-        public function isDeletedGuestTakeay($table_id,$warehouse_id){
-            $file = $table_id.'.json';
-            $path = $this->generate_removing_file_path($file,$warehouse_id);
-            $result = false;
-            if(file_exists($path))
-            {
-                $result = true;
-            }
-            return $result;
-        }
+        
         
         public function op_add_order_after($order,$order_parse_data){
             $source_type = isset($order_parse_data['source_type']) ? $order_parse_data['source_type'] : '';
@@ -1511,7 +1325,7 @@ if(!class_exists('OP_Table'))
                     if($deks_id )
                     {
                         
-                        $current_desk = $this->bill_screen_data($deks_id);
+                        $current_desk = $this->get_data($deks_id);
                        
                         $desk_items = isset($current_desk['items']) ? $current_desk['items'] : array();
                        
@@ -1712,6 +1526,173 @@ if(!class_exists('OP_Table'))
                     
                 }
                 $result['qty'] -= $current_qty;
+            }
+            return $result;
+        }
+        public function get_data($table_id,$type = 'dine_in',$outlet_id = 0){
+            $table_key = $table_id;
+            if($type != 'dine_in')
+            {
+                $table_key = $type.'-'.$table_id;
+            }
+            $cache_group = $this->_cache_group;
+            $cache_key = 'op_table_'.$outlet_id.'_'.$table_key;
+            $cached_data = wp_cache_get( $cache_key, $cache_group );
+            if ( false !== $cached_data && false )
+            {
+                $result = $cached_data;
+            }else{
+                $data = $this->_bill_screen_data($table_id,$type);
+                wp_cache_set( $cache_key, $data, $this->_cache_group );
+                $result = $data;
+            }
+            return apply_filters('op_table_data',$result,$table_id,$type,$outlet_id,$this);
+            
+        }
+        public function update_data($data = array(),$table_id = 0,$type = 'dine_in',$outlet_id = 0){
+            $table_key = $table_id;
+            if($type != 'dine_in')
+            {
+                $table_key = $type.'-'.$table_id;
+            }
+
+            $cache_group = $this->_cache_group;
+            $cache_key = 'op_table_'.$outlet_id.'_'.$table_key;
+
+            $file_path = $this->bill_screen_file_path($table_key);
+            $file_mode = $this->get_file_mode();
+            
+            if(file_exists($file_path))
+            {
+                if ( defined( 'FS_CHMOD_FILE' ) ) {
+                    $this->_filesystem->put_contents(
+                        $file_path,
+                        json_encode($data)
+                    );
+                }else{
+                    $this->_filesystem->put_contents(
+                        $file_path,
+                        json_encode($data),
+                        $file_mode
+                    );
+                }
+                
+            }else{
+                
+                $this->_filesystem->put_contents(
+                    $file_path,
+                    json_encode($data),
+                    $file_mode // predefined mode settings for WP files
+                );
+            }
+            if($type == 'takeaway')
+            {
+                $this->add_takeaway($table_id,$outlet_id);
+            }
+            if($type == 'guest_takeaway')
+            {
+                $this->add_takeaway($table_id,$outlet_id,true);
+            }   
+       
+            
+
+            wp_cache_delete($cache_key, $cache_group );
+            do_action('op_update_table_data_after',$data,$table_id,$type,$outlet_id,$this);
+        }
+        
+        public function remove_data($table_id,$type = 'dine_in',$outlet_id = 0){
+            $table_key = $table_id;
+            if($type != 'dine_in')
+            {
+                $table_key = $type.'-'.$table_id;
+            }
+            $cache_group = $this->_cache_group;
+            $cache_key = 'op_table_'.$outlet_id.'_'.$table_key;
+
+            $table_data = $this->get_data($table_id,$type);
+
+            $transient_key = 'op_table_deleted_'.$outlet_id.'_'.$type.'_'.$table_id;
+            set_transient ($transient_key, $table_data, WEEK_IN_SECONDS);
+
+            $file_path = $this->bill_screen_file_path($table_key);
+            if(file_exists($file_path))
+            {
+                unlink($file_path);
+            }
+            wp_cache_delete($cache_key, $cache_group );
+            do_action('op_remove_table_data_after',$table_id,$type,$outlet_id,$this);
+        }
+        public function is_deleted($table_id,$type='dine_in',$outlet_id=0){
+            $transient_key = 'op_table_deleted_'.$outlet_id.'_'.$type.'_'.$table_id;
+            $transient_value = get_transient($transient_key);
+            return ($transient_value !== false);
+        }
+        //save takeaway and guest takeaway list to transient
+        public function add_takeaway($takeaway_id,$outlet_id,$is_guest = false){
+            $result = array();
+            $transient_key = 'op_all_takeaway_'.$outlet_id;
+            if($is_guest)
+            {
+                $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
+            }
+            $transient_value = get_transient($transient_key);
+            if($transient_value !== false)
+            {
+                $result = $transient_value;
+            }
+            if(!in_array($takeaway_id,$result))
+            {
+                $result[] = $takeaway_id;
+            }
+            set_transient ($transient_key, $result, WEEK_IN_SECONDS);
+            return $result;
+        }
+        public function remove_all_takeaway($outlet_id,$is_guest = false){
+            $transient_key = 'op_all_takeaway_'.$outlet_id;
+            if($is_guest)
+            {
+                $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
+            }
+            delete_transient( $transient_key );
+        }
+        public function remove_takeaway($takeaway_id,$outlet_id,$is_guest = false){
+            $result = array();
+            $transient_key = 'op_all_takeaway_'.$outlet_id;
+            if($is_guest)
+            {
+                $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
+            }
+            $transient_value = get_transient($transient_key);
+            if($transient_value !== false)
+            {
+                $result = $transient_value;
+            }
+            if(in_array($takeaway_id,$result))
+            {
+                $key = array_search($takeaway_id,$result);
+                unset($result[$key]);
+                $result = array_values($result);
+            }
+            set_transient ($transient_key, $result, WEEK_IN_SECONDS);
+            return $result;
+        }
+        public function takeaways($outlet_id){
+            $result = array();
+            $transient_key = 'op_all_takeaway_'.$outlet_id;
+            $transient_value = get_transient($transient_key);
+            if($transient_value !== false)
+            {
+                $result = $transient_value;
+            }
+            return $result;
+        }
+        public function guest_takeaways($outlet_id){
+            $result = array();
+            $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
+            $transient_value = get_transient($transient_key);
+            if($transient_value !== false)
+            {
+                $result = $transient_value;
             }
             return $result;
         }

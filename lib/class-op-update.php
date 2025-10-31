@@ -7,6 +7,7 @@ if(!class_exists('OP_Update'))
         private $plugin_path;
         private $plugin_basename;
         private $purchase_code;
+        private $slug = 'woocommerce-openpos';
         private $api_url = 'https://wpos.app/openpos-update.php';
         
         public function __construct($plugin_path,$item_id)
@@ -23,7 +24,11 @@ if(!class_exists('OP_Update'))
                 add_filter('plugin_action_links_' . $this->plugin_basename, array($this, 'display_purchase_code_edit_link'));
             }
             add_action('wp_ajax_op_up_pc_change', array($this, 'op_up_pc_change'));
+            add_action('wp_ajax_op_up_pc_refresh', array($this, 'op_up_pc_refresh'));
             add_action( 'install_plugins_pre_plugin-information', array($this,'op_plugin_details'));
+
+            add_action( 'after_plugin_row_' . $this->plugin_basename, array( $this, 'show_update_notification' ), 10, 2 );
+           
         }
         public static function init($plugin_path,$item_id){
             new self($plugin_path,$item_id);
@@ -108,7 +113,6 @@ if(!class_exists('OP_Update'))
                 'requires_php'  => '',
                 'compatibility' => new stdClass(),
             );
-
             if($license)
             {
                 $update = $this->api_request('check_update',array(
@@ -120,9 +124,19 @@ if(!class_exists('OP_Update'))
                     'author' => 'anhvnit@gmail.com',
                     'beta' => false
                 ));
+                
+                if($update)
+                {
+                    set_site_transient( 'openpos_update_notification', $update );
+                }
+               
                 if ( $update && isset($update->new_version) && $update->new_version != null && $current_version != null  && version_compare($update->new_version, $current_version) > 0  ) {
-    
-                    $transient->response['woocommerce-openpos/woocommerce-openpos.php'] = $update;
+                    if( isset($update->license_status) && isset($update->license_message))
+                    {
+                        $transient->no_update['woocommerce-openpos/woocommerce-openpos.php'] = $item;
+                    }else{
+                        $transient->response['woocommerce-openpos/woocommerce-openpos.php'] = $update;
+                    }
                 } else {
                     $transient->no_update['woocommerce-openpos/woocommerce-openpos.php'] = $item;
                 }
@@ -235,6 +249,7 @@ if(!class_exists('OP_Update'))
                     if($license_details->status && $license_details->status == 1)
                     {
                         update_option('_op_purchase_code',$purchase_code,false);
+                        delete_site_transient( 'update_plugins' );
                         $result['status'] = 1;
                         $result['message'] = __('Thank you! Your purchase code is valid.','openpos');
                     }
@@ -247,6 +262,25 @@ if(!class_exists('OP_Update'))
             }
             
 
+            echo json_encode($result);
+            exit;
+        }
+        public function op_up_pc_refresh(){
+            $result = array(
+                'status' => 1,
+                'message' => __('Unknown','openpos')
+            );
+            $this->api_request('check_license',array(
+                'license' => $this->purchase_code,
+                'item_id'            => $this->item_id,
+                'item_name'            => 'openpos',
+                'slug' => $this->plugin_key,
+                'author' => 'anhvnit@gmail.com',
+                'url'         => home_url(),
+                'admin_email' => get_option('admin_email'),
+                'beta' => false
+            ));
+            delete_site_transient( 'update_plugins' );
             echo json_encode($result);
             exit;
         }
@@ -330,5 +364,47 @@ if(!class_exists('OP_Update'))
 			</div>
 			<?php
 		}
+        public function show_update_notification(){
+            $update_cache = get_site_transient( 'openpos_update_notification' );
+            if($update_cache && isset($update_cache->license_status) && isset($update_cache->license_message))
+            {
+                $op_nonce = wp_create_nonce( 'op_nonce' );
+                $changelog_link = self_admin_url( 'plugin-install.php?tab=plugin-information&plugin=woocommerce-openpos&section=changelog&TB_iframe=true&width=600&height=800' );
+                // Display message about updates
+                echo '<tr class="plugin-update-tr" id="' . $this->slug . '-update" data-slug="' . $this->slug . '" data-plugin="' . $this->plugin_basename .  '">';
+                echo '<td colspan="4" class="plugin-update colspanchange">';
+                echo '<div class="update-message notice inline notice-warning notice-alt">';
+                echo sprintf(__('<p>There is a new version of Woocommerce OpenPos available. <a href="%s" class="thickbox open-plugin-details-modal" aria-label="View Woocommerce OpenPos version %s details">View version details</a>.</p>','openpos'),$changelog_link,$update_cache->new_version);
+                echo $update_cache->license_message;
+                echo '<script type="text/javascript" style="display: none;">';
+                echo "jQuery(document).ready(function() {
+
+                    // Bind click action
+                    jQuery('.op_up_pc_refresh_$this->plugin_key').click(function() {
+                       jQuery.post(
+                            '" . admin_url('admin-ajax.php') . "',
+                            {
+                                'action':           'op_up_pc_refresh',
+                                'plugin_key':       '$this->plugin_key',
+                                'op_nonce':       '$op_nonce'
+                            },
+                            function(response) {
+                                window.location.reload();
+                            },
+                            'json'
+                        );
+                    });
+
+                   
+                });";
+                echo '</script>';
+
+                echo '</div></td></tr>';
+                // end display message about updates
+            }
+
+           
+        }
+        
     }
 }

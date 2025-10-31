@@ -16,6 +16,7 @@
 
 (function($) {
     var total_item = 0;
+    let lastCheck = 0;
     var view_type = 'items';
     let client_time_offset = new Date().getTimezoneOffset();
     let last_html_str = '';
@@ -30,7 +31,9 @@
     var hide_orders = {};
 
     function getDataInit(callback){
-        var time_data_url = data_url + '?t='+ Date.now();
+
+        //var time_data_url = data_url + (data_url.indexOf('?') !== -1 ? '&' : '?') + 't=' + Date.now();
+        var time_data_url = data_url+'/' +lastCheck;
         
         if($('body').hasClass('processing'))
         {
@@ -41,94 +44,92 @@
                 url : time_data_url,
                 type: 'get',
                 dataType: 'json',
-                //data: $('#kitchen-form').serialize()+'&action=get_data&client_time_offset='+client_time_offset,
                 beforeSend:function(){
                     $('body').addClass('processing');
-                    
                 },
                 success: function(response){
                     //$('#kitchen-table-body').empty();
-                    
-                    var list_html = '';    
-                    var _index = 1;
-                    let selected_view_type = $('input[name="display"]').val();
-                    let selected_area = $('select[name="type"]').val();
-
-                    
-                   
-                    let data_response = [];
-                    if(selected_view_type == 'items' && response['items'])
+                    if(!response.code )
                     {
-                        data_response = response['items'][selected_area];
-                    }
-                    if(selected_view_type == 'orders' && response['orders'])
-                    {
-                        data_response = response['orders'][selected_area];
-                        current_orders = data_response;
-                    }
-                    var template = ejs.compile(data_template['template'], {});
-                    let max_version = 0;
-                    for(var i in data_response)
-                    {
-                        
-                        
-                        var row_data = data_response[i];
-                        if(selected_view_type == 'orders')
+                        var list_html = '';    
+                        var _index = 1;
+                        let selected_view_type = $('input[name="display"]').val();
+                        let selected_area = $('select[name="type"]').val();
+                        let data_response = [];
+                        if(selected_view_type == 'items' && response['items'])
                         {
-                            if(row_data['ver'] > max_version)
-                            {
-                                max_version = row_data['ver'];
-                            }
-                            var order_id = row_data['id'];
-                            var order_version = row_data['ver'];
-                            if(hide_orders[order_id] && hide_orders[order_id] >= order_version)
-                            {
-                                continue;
-                            }
-                            
+                            data_response = response['items'][selected_area];
                         }
-
-                        let order_time = row_data['order_timestamp'];
-                        row_data['time_ago'] = $.timeago(order_time);
-
-                        row_data['index'] = _index;
-                        var in_process = readied_items.indexOf(row_data['id']);
-                        
-                        if(in_process >= 0)
+                        if(selected_view_type == 'orders' && response['orders'])
                         {
-                            row_data['done'] = 'ready';
+                            data_response = response['orders'][selected_area];
+                            current_orders = data_response;
                         }
-                        var html = template(row_data);
-                        list_html += html;
-                        _index++;
-                    }
-                    
-                    if(_index > total_item)
-                    {
-                        $('body').trigger('new-dish-come');
-                    }
-                    total_item = _index;
-                    let has_update = false;
-                    
-                    if(selected_view_type == 'orders' && last_version > max_version)
-                    {
-                        has_update = true;
-                        max_version = last_version;
-                    }else{
-                        if(last_html_str == '' || last_html_str != list_html)
+                        var template = ejs.compile(data_template['template'], {});
+                        let max_version = 0;
+                        for(var i in data_response)
                         {
                             
+                            
+                            var row_data = data_response[i];
+                            if(selected_view_type == 'orders')
+                            {
+                                if(row_data['ver'] > max_version)
+                                {
+                                    max_version = row_data['ver'];
+                                }
+                                var order_id = row_data['id'];
+                                var order_version = row_data['ver'];
+                                if(hide_orders[order_id] && hide_orders[order_id] >= order_version)
+                                {
+                                    continue;
+                                }
+                                
+                            }
+    
+                            let order_time = row_data['order_timestamp'];
+                            row_data['time_ago'] = $.timeago(order_time);
+    
+                            row_data['index'] = _index;
+                            var in_process = readied_items.indexOf(row_data['id']);
+                            
+                            if(in_process >= 0)
+                            {
+                                row_data['done'] = 'ready';
+                            }
+                            var html = template(row_data);
+                            list_html += html;
+                            _index++;
+                        }
+                        
+                        if(_index > total_item)
+                        {
+                            $('body').trigger('new-dish-come');
+                        }
+                        total_item = _index;
+                        let has_update = false;
+                        
+                        if(selected_view_type == 'orders' && last_version > max_version)
+                        {
                             has_update = true;
+                            max_version = last_version;
+                        }else{
+                            if(last_html_str == '' || last_html_str != list_html)
+                            {
+                                
+                                has_update = true;
+                            }
                         }
+                        
+                        if(has_update)
+                        {
+                            $('#kitchen-table-body').html(list_html);
+                            last_html_str = list_html;
+                            order_item_size();
+                        }
+                        
                     }
-                    
-                    if(has_update)
-                    {
-                        $('#kitchen-table-body').html(list_html);
-                        last_html_str = list_html;
-                        order_item_size();
-                    }
-                    
+                    lastCheck = Math.floor(Date.now() / 1000); 
                     $('body').removeClass('processing');
                     callback();
                 },
@@ -407,18 +408,25 @@
             }
             
         });
-        $(document).on('click','.grid-setting-action',function(){
+        $(document).on('click','.grid-setting-action',function(e){
             let action = $(this).data('action');
             let type = $(this).data('type');
-            
-            if(action == 'increase')
+            console.log(action);
+            switch(action)
             {
-                increaseAction(type);
+                case 'increase':
+                    increaseAction(type);
+                    break;
+                case 'reduct':
+                    reductAction(type);
+                    break;
+                case 'darkmode':
+                    let is_checked = e.target.checked;
+                    console.log(e);
+                    is_checked ?  $('body').addClass('dark-mode') : $('body').removeClass('dark-mode'); 
+                    break;
             }
-            if(action == 'reduct')
-            {
-                reductAction(type);
-            }
+           
             screenSizeInit();
             order_item_size();
         });

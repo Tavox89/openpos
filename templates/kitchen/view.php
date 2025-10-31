@@ -100,7 +100,19 @@
       <div class="modal-body">
         <form class="form-horizontal">
             <div class="form-group">
-                <label for="inputEmail3" class="col-sm-2 col-xs-4 control-label">Columns</label>
+                <label for="inputPassword3" class="col-sm-2 col-xs-4 control-label"><?php echo __('Dark mode','openpos'); ?></label>
+                <div class="col-sm-6 col-xs-8">
+                    <div class="row">
+                        <div class="col-sm-4 col-xs-4">
+                            <input class="btn btn-default grid-setting-action" data-action="darkmode" id="input-darkmode" type="checkbox" />
+                        </div>
+                       
+                    </div>
+                    
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="inputEmail3" class="col-sm-2 col-xs-4 control-label"><?php echo __('Columns','openpos'); ?></label>
                 <div class="col-sm-6 col-xs-8">
                     <div class="row">
                         <div class="col-sm-4 col-xs-4">
@@ -117,7 +129,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="inputPassword3" class="col-sm-2 col-xs-4 control-label">Rows</label>
+                <label for="inputPassword3" class="col-sm-2 col-xs-4 control-label"><?php echo __('Rows','openpos'); ?></label>
                 <div class="col-sm-6 col-xs-8">
                     <div class="row">
                         <div class="col-sm-4 col-xs-4">

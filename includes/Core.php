@@ -118,7 +118,7 @@ class Openpos_Core
             'order'                  => 'ASC',
             'hide_empty'             => false,
         );
-        
+       
 
         $the_query = new WP_Term_Query($tax_args);
         $terms = $the_query->get_terms();

@@ -408,7 +408,12 @@ span.icon-op-desk::before,
 .layout-mode-dark .product-list-category-menu-container .product-list-category-menu li.active a{
     color:#ff6d00!important;
 }
-
+.layout-mode-dark .content-right{
+    background-color: #888!important;
+}
+.layout-mode-dark  .cart-tab{
+    color:#000!important;
+}
 /* Dialog dark mode */
 .dialog-layout-mode-dark app-item{
     color: #fff;

@@ -430,7 +430,9 @@ if(!class_exists('OP_Woo_Cart'))
             $customer_data = $cart_data['customer'];
             if(!$is_api)
             {
+                
                 $cart = new WC_Cart();
+                //$cart->empty_cart(false);
                 if(!empty($customer_data)) {
 
                     if ($customer_data['id'] && $customer_data['id'] > 0) {
@@ -544,6 +546,108 @@ if(!class_exists('OP_Woo_Cart'))
                 wp_set_current_user(0);
             }else{
                 // api calc discount
+                if ( !WC()->session ) {
+                    wc_load_cart();
+                }
+                $items = $cart_data['items'];
+                foreach($items as $item)
+                {
+                    $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+                    $product_qty = isset($item['qty']) ? $item['qty'] : 0;
+                    if($product_id && $product_qty)
+                    {
+                        WC()->cart->add_to_cart($product_id,$product_qty);
+                    }
+                }
+
+                $post_customer_data = array();
+                if(!empty($customer_data))
+                {
+                    //$customer = WC()->cart->get_customer();
+    
+                    if ( ! WC()->customer ) {
+                        $customer = new WC_Customer();
+                    }else{
+                        $customer = WC()->customer;
+                    }
+                    if(isset($customer_data['email']) && $customer_data['email'])
+                    {
+                        $customer->set_email($customer_data['email']);
+                    }
+                    if(isset($customer_data['firstname']) && $customer_data['firstname'])
+                    {
+                        $customer->set_first_name($customer_data['firstname']);
+                        
+                    }
+                    if(isset($customer_data['lastname']) && $customer_data['lastname'])
+                    {
+                        $customer->set_last_name($customer_data['lastname']);
+                        
+                    }
+                    if($customer_data['address'])
+                    {
+                        $customer->set_address($customer_data['address']);
+                       
+                    }
+    
+                    if(isset($customer_data['address_2']) && $customer_data['address_2'])
+                    {
+                        $customer->set_address_2($customer_data['address_2']);
+                        
+                    }
+    
+                    if(isset($customer_data['state']) && $customer_data['state'])
+                    {
+                        $customer->set_state($customer_data['state']);
+                        
+                    }
+    
+                    if(isset($customer_data['city']) && $customer_data['city'])
+                    {
+                        $customer->set_city($customer_data['city']);
+                       
+                    }
+    
+                    if(isset($customer_data['country']) && $customer_data['country'])
+                    {
+                        $customer->set_country($customer_data['country']);
+                        
+                    }
+    
+                    if(isset($customer_data['postcode']) && $customer_data['postcode'])
+                    {
+                        $customer->set_postcode($customer_data['postcode']);
+                        
+                    }
+                    WC()->customer = $customer;
+    
+                }
+                WC()->session->set('refresh_totals', true);
+                WC()->cart->calculate_totals();
+    
+               
+                $discount_amount = 0;
+                $coupons  = WC()->cart->get_coupons();
+                $discount_type = 'fixed';
+                foreach($coupons as $coupon)
+                {
+                    $discount_amount += $coupon->get_amount();
+                    $tmp_discount_type = $coupon->get_discount_type();
+                    if($tmp_discount_type == 'percent')
+                    {
+                        $discount_type = 'percent';
+                    }
+                }
+                if($discount_amount)
+                {
+                    $result = array(
+                        'discount_amount' => $discount_amount,
+                        'discount_type' => $discount_type // percent , fixed
+                        
+                    );
+                }
+            
+                
             }
             
             return $result;

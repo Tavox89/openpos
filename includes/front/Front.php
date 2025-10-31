@@ -3799,7 +3799,7 @@ class Openpos_Front{
                     if($desk_type == 'guest_takeaway')
                     {
                         $table_id = 'takeaway-'.$table['desk']['id'];
-                        if($op_table->isDeletedGuestTakeay($table_id,$warehouse_id))
+                        if($op_table->is_deleted($table_id,$desk_type,$warehouse_id))
                         {
                             
                             throw new Exception(__('Your order has been deleted. Please scan order QRcode and try again.','openpos'));
@@ -4462,13 +4462,14 @@ class Openpos_Front{
                 //disable auto background save item on table
                 if(!empty($tables))
                 {
-                    $op_table->update_bill_screen($tables,true);
+                    $op_table->update_bill_screen($tables,true,'background');
                 }
                 
+                $request_takeaway = isset($_REQUEST['takeaway']) ?  json_decode(stripslashes($_REQUEST['takeaway']),true) : array();
 
                 $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                 
-                $update_data = $op_table->get_all_update_data($warehouse_id,$last_check,$last_check_utc);
+                $update_data = $op_table->get_all_update_data($request_takeaway,$warehouse_id,$last_check,$last_check_utc);
 
                 $tables_version = isset($update_data['tables_version']) ? $update_data['tables_version'] : array();
 
@@ -4482,8 +4483,7 @@ class Openpos_Front{
                     $desk_message = sprintf(__( 'There are new message from tables: %s', 'openpos' ),implode(',',$tables_desk_messages));
                     
                 }
-                // $tables_version = $op_table->tables_version($warehouse_id);
-                // $ready_dish = $op_table->ready_dishes($warehouse_id);
+               
             }
 
             $result['data']['deleted_takeaway'] = $deleted_takeaway;

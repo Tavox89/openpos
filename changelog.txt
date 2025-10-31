@@ -1,3 +1,12 @@
+- 13/10/2025 (8.0) - 8.0.3
+   - new feature: cart multi tab, it help staff can ignore a customer without stuck queue. https://prnt.sc/dMx0dA9LRYWg
+   - Change from ajax to restful api
+   - Improve speed for offline search product, it can search LIKE words, not only match words as old
+   - Able use POS on pos.wpos.app with your site url
+   - Speed improvement. Tested with 10,000 products. 
+   - Limit login failed time. 
+   - Fixed customer report bug
+   - NOTE: this is big update, to use it, pls clean browser cache, close browser and open again, uninstall pwa and reinstall + test.
 - 25/08/2025 (7.3.8)
    - sound beep correct follow time click on product
    - add debit amount at my account page of customer frontend website

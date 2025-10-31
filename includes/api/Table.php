@@ -58,7 +58,12 @@ if(!class_exists('OP_REST_API_Table'))
                 'permission_callback' => array($this,'permission_callback'),
                 ) 
             );
-            
+            register_rest_route( $this->namespace, '/kitchen/(?P<store_id>\d+)/(?P<time_id>\d+)', array(
+                'methods' => WP_REST_Server::READABLE,
+                'callback' => array($this,'kitchen_data'),
+                'permission_callback' => '__return_true',
+                ) 
+            );
             
         }
         public function tables(WP_REST_Request $request = null){
@@ -79,7 +84,7 @@ if(!class_exists('OP_REST_API_Table'))
                 }
                 foreach($desk_ids as $desk_id)
                 {
-                    $desk_data = $this->table_class->bill_screen_data($desk_id);
+                    $desk_data = $this->table_class->get_data($desk_id);
                     $items = isset($desk_data['items']) ? $desk_data['items'] : array();
                     $version = isset($desk_data['ver']) ? $desk_data['ver'] : 0;
                     $sys_version = isset($desk_data['system_ver']) ? $desk_data['system_ver'] : 0;
@@ -139,6 +144,7 @@ if(!class_exists('OP_REST_API_Table'))
                 }
                 $warehouse_id = $this->session_data['login_warehouse_id'];
                 $list = $this->table_class->takeawayJsonTables($warehouse_id,$desk_ids);
+               
                 $result['response']['data'] =  $list;
                 $result['code'] = 200;
                 $result['response']['status'] = 1;
@@ -162,7 +168,7 @@ if(!class_exists('OP_REST_API_Table'))
                 'api_message' => ''
             );
             try{
-                $tables =json_decode($request->get_param('tables'),true);
+                $tables = json_decode($request->get_param('tables'),true);
                 
                 $is_force = $request->get_param('fore_update')  == 'yes' ? true : false;
                 
@@ -175,32 +181,38 @@ if(!class_exists('OP_REST_API_Table'))
                     $warehouse_id = $session_data['login_warehouse_id'];
                     
                     //save to table data
+                    
                     foreach($tables as $table_id => $table)
                     {
                         $desk_type = $this->table_class->getDeskType($table);
 
                         //old data
+                        $table_type = 'dine_in';
                         if(strpos($table_id,'desk') !== false )
                         {
                             $_table_id = str_replace('desk-','',$table_id);
-                            $_old_tables[$table_id] = $this->table_class->bill_screen_data($_table_id);
+                            
                         }
                         if(strpos($table_id,'takeaway') !== false )
                         {
                             $_table_id = str_replace('takeaway-','',$table_id);
-                            $_old_tables[$table_id] = $this->table_class->bill_screen_data($_table_id,'takeaway');
+                            $table_type = 'takeaway';
+                            
                         }
-                        //end old data
+                        
 
                         if($desk_type == 'guest_takeaway')
                         {
                             $table_id = 'takeaway-'.$table['desk']['id'];
-                            if($this->table_class->isDeletedGuestTakeay($table_id,$warehouse_id))
-                            {
+                            $_table_id = $table['desk']['id'];
+                            if($this->table_class->is_deleted($table_id,$desk_type,$warehouse_id)){
                                 
                                 throw new Exception(__('Your order has been deleted. Please scan order QRcode and try again.','openpos'));
                             }
                         }
+                        $_old_tables[$table_id] = $this->table_class->get_data($_table_id,$desk_type,$warehouse_id);
+
+                        
                         
                         if(strpos($table_id,'takeaway') !== false )
                         {
@@ -211,6 +223,7 @@ if(!class_exists('OP_REST_API_Table'))
                     }
                 }
                 do_action('op_upload_desk_after',$_tables,$this->table_class,$tables,$_old_tables,$session_data);
+              
                 $result['response']['data'] = $this->table_class->update_bill_screen($_tables,$is_force);
                 $result['response']['status'] = 1;
                 $result['code'] = 200;
@@ -351,11 +364,12 @@ if(!class_exists('OP_REST_API_Table'))
                 }
                 if(strpos($desk_id,'takeaway-') === 0)
                 {
-                    $desk_data = $this->table_class->bill_screen_data($desk_id);
+                    $_table_id = str_replace('takeaway-','',$desk_id);
+                    $desk_data = $this->table_class->get_data($_table_id,'takeaway');
                     $result_data = $desk_data;
                 }else{
-                    
-                    $desk_data = $this->table_class->bill_screen_data($desk_id);
+                    $_table_id = str_replace('desk-','',$desk_id);
+                    $desk_data = $this->table_class->get_data($_table_id);
                     $items = isset($desk_data['items']) ? $desk_data['items'] : array();
                     $version = isset($desk_data['ver']) ? $desk_data['ver'] : 0;
                     $system_ver = isset($desk_data['system_ver']) ? $desk_data['system_ver'] : 0;
@@ -542,6 +556,58 @@ if(!class_exists('OP_REST_API_Table'))
                 $result['response']['status'] = 0;
                 $result['response']['message'] = $e->getMessage();
                 
+            }
+            return $this->rest_ensure_response($result);
+        }
+
+        public function kitchen_data($request){
+            $result = array(
+                'code' =>'unknown_error',
+                'response' => array(
+                    'status' => 0,
+                    'data' => array(),
+                    'message' => ''
+                ),
+                'api_message' => ''
+            );
+            try{
+                $store_id = $request->get_param('store_id');
+                $last_check = $request->get_param('time_id');
+                $cache_group = 'openpos';
+                $cache_key = 'op_kitchen_'.$store_id;
+                $start_time = time();
+                $file =  $this->table_class->kitchen_data_path($store_id);
+                
+                $max_time = ini_get('max_execution_time');
+                $timeout = min($max_time - 5, 20);
+                while ((time() - $start_time) < $timeout) {
+                    clearstatcache(true, $file); 
+                    $modified_time = file_exists($file) ? @filemtime($file) : 0;
+                   
+                    if ($modified_time > $last_check) {
+
+                        $cached_data = wp_cache_get( $cache_key, $cache_group );
+                        if ( false !== $cached_data )
+                        {
+                            $data =  $cached_data;
+                        }else{
+                            $data = file_get_contents($file);
+                            wp_cache_set( $cache_key, $data, $cache_group, 300 );
+                        }
+                        //print_r($modified_time.'|'.$last_check);
+                        echo $data;
+                        exit();
+                    }
+                    sleep(1);
+                }
+                throw new Exception(__('No change','openpos'),200);
+                
+            }catch(Exception $e)
+            {
+                
+                $result['code'] = $e->getCode();
+                $result['response']['status'] = 0;
+                $result['response']['message'] = $e->getMessage();
             }
             return $this->rest_ensure_response($result);
         }

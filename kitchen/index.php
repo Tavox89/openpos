@@ -65,7 +65,7 @@ $kitchen_url =  $core->get_kitchen_url($id,true);
 if(isset($_REQUEST['action']) && $_REQUEST['action'] == 'clear_data')
 {
     $id = isset($_REQUEST['warehouse']) ? intval($_REQUEST['warehouse']) : 0;
-    $op_table->clear_takeaway($id);
+    $op_table->clear_all_data($id);
     exit;
 }
 if(isset($_REQUEST['action']) && $_REQUEST['action'] == 'update_ready')

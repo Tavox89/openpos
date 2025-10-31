@@ -506,7 +506,7 @@ if(!class_exists('OP_REST_API_Cart'))
                 $result['response']['data']['discount_type'] = 'fixed'; // fixed , percent
     
                 $result['response']['status'] = 1;
-                $cost = $this->cart_class->getCartDiscount($cart);
+                $cost = $this->cart_class->getCartDiscount($cart,true);
                 if(!empty($cost))
                 {
                     $result['response']['data']['discount_amount'] = $cost['discount_amount'];

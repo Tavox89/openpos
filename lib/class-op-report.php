@@ -1232,17 +1232,21 @@ if(!class_exists('OP_Report'))
                             $login_cashdrawer_id = (int)get_post_meta($p->ID,'login_cashdrawer_id',true);
                            
         
-                            $content = $p->post_content;
+                            //$content = $p->post_content;
+                            $content = get_post_meta($p->ID,'json_data',true);
                             $zreport_data = json_decode($content,true);
 
+                            if(!is_array($zreport_data) || empty($zreport_data)){
+                                $content = get_post_meta($p->ID,'json_data',true);;
+                                $zreport_data = json_decode($content,true);
+                            }
                             
                             
                             
-                            
-                            if(is_array($zreport_data) && isset($zreport_data['session_data']))
+                            if(is_array($zreport_data) && !empty($zreport_data))
                             {
-                                $session_data = $zreport_data['session_data'];
-                                $_logged_in_time = isset($session_data['logged_time']) ? $session_data['logged_time'] : 0;
+                               
+                                $_logged_in_time = isset($zreport_data['logged_time']) ? $zreport_data['logged_time'] : 0;
                                 $_logged_out_time  = isset($zreport_data['logged_out_time']) ? $zreport_data['logged_out_time'] : 0; 
                                 $order_total  += isset($zreport_data['order_total']) ? 1*$zreport_data['order_total'] : 0; 
                                 if(!$_logged_out_time){

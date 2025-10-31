@@ -1,5 +1,6 @@
 {
   "LOGIN": {
+    "PREPARING": "PREPARING. PLEASE WAIT ...",
     "TITLE": "Login",
     "TITLE_LOGON": "Logon",
     "SITE_URL": "Site Url",
@@ -17,10 +18,16 @@
     "MSG_LOGIN_GUIDE": "Click here to login",
     "MSG_LOGIN_WELCOME": "Welcome back!",
     "MSG_LOGON_WELCOME": "Welcome {{staff}}",
-    "MSG_PIN": "Enter your PIN"
+    "MSG_PIN": "Enter your PIN",
+    "SITE_URL_HINT": "Example: https://yoursite.com",
+    "SITE_URL_SUGGESTION": "Please make sure you are install plugin before use this pos.",
+    "GUIDE_MESSAGE_URL": "Enter your site url and click next.",
+    "GUIDE_MESSAGE": "Enter login information to login."
   },
   "CART": {
     "TITLE_CART": "Cart",
+    "TAB_ADD": "+ New Cart",
+    "TAB_LABEL": "Cart {{id}}",
     "TITLE_PRODUCT": "Product",
     "TITLE_QTY": "Qty",
     "TITLE_PRICE": "Price",
@@ -143,7 +150,9 @@
     "NO_TAX_WARNING" : "Please choose Tax to checkout",
     "BTN_PAY_SELF": "Pay - {{total}}",
     "BTN_CONFIRM_CHECKOUT": "{{total}}",
-    "LABEL_DESK_CHOOSE": "Choose"
+    "LABEL_DESK_CHOOSE": "Choose",
+    "LABEL_CLOSETAB": "Close Tab",
+    "MSG_CLOSETAB": "Are you sure ?"
   },
   "CHECKOUT": {
     "LABEL_CHECKOUT" : "Checkout",
@@ -252,7 +261,8 @@
     "BTN_CONFIRM_LOGOUT" : "Confirm",
     "MSG_WARNING_LOGOUT" : "There are few orders/transactions do not sync with server yet. Please check orders/transactions list before logout!",
     "MSG_PRODUCT_NOT_FOUND" : "No products found",
-    "MSG_DESK_PENDING_ITEM" : "There are pending items. Please send or delete them to continue.",
+    "MSG_DESK_PENDING_ITEM" : "There are pending items / pending delete items. Please send or delete them to continue.",
+    "MSG_DESK_DELETING_ITEM" : "There are pending delete items. Please send them to continue.",
     "OPEN_CASH_NOTE_MSG" : "Open Cash Adjustment",
     "CHART_SALES":"Sales",
     "APP_CATEGORIES":"Categories",
@@ -355,7 +365,8 @@
     "TEXT_PLACEHOLDER_SELECT" : "Choose...",
     "TEXT_DISCOUNT_INVALID" : "Your entered value {{enter_value}} is invalid. Maxium value {{max_value}}",
     "TEXT_DATA_INVALID" : "Please check your item data. Some field required but missing",
-    "TEXT_VARIATION_INVALID" : "Please check your item variation data."
+    "TEXT_VARIATION_INVALID" : "Please check your item variation data.",
+    "TEXT_MAX_DISCOUNT_APPLY" : "Maximum discount apply is {{amount}}"
   },
   "OPTION":{
     "BTN_CANCEL" : "Cancel",
@@ -464,6 +475,7 @@
   },
   "PRODUCTS": {
     "MSG_BARCODE_NOT_FOUND" : "No product found with barcode '{{barcode}}'",
+    "MSG_SEARCH_NOT_FOUND" : "No product found with keyword '{{term}}'",
     "LABEL_RECENT_PRODUCT" : "Recent products",
     "LABEL_ALL_PRODUCTS" : "All products",
     "LABEL_NO_PRODUCT" : "No product found",
@@ -703,7 +715,7 @@
     "CATEGORIES":"Categories",
     "PRODUCTS":"Products",
     "TIME_JUST_NOW" : "just now",
-    "TIME_SECOND_AGO" : "secon ago",
+    "TIME_SECOND_AGO" : "second ago",
     "TIME_SECOND_SAGO" : "seconds ago",
     "TIME_MIN_AGO" : "minute ago",
     "TIME_MIN_SAGO" : "minutes ago",

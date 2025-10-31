@@ -67,20 +67,18 @@ if(!class_exists('OP_REST_API_Product'))
             try{
                 $session_data = $this->session_data;
                 $term = $request->get_param( 'term' ) ? $request->get_param( 'term' ) : '';
+                $pull_session = $request->get_param( 'pull_session' ) ? $request->get_param( 'pull_session' ) : '';
                 if($term)
                 {
                     $term = sanitize_text_field($term);
                 }
                 $per_page = $request->get_param( 'per_page' ) ;
                 $page = $request->get_param( 'page' ) ? $request->get_param( 'page' ) : 1;
-                if($page == 1)
-                {
-                    //$this->core_class->clear_all_product_cache();
-                }
+               
                 $rowCount = $per_page ? $per_page : apply_filters('op_load_product_per_page',50);
                 $current = $page;
                 $offet = ($current -1) * $rowCount;
-                $sortBy = 'title';
+                $sortBy = 'post_type';
                 $order = 'ASC';
         
                 $args = array(
@@ -103,7 +101,7 @@ if(!class_exists('OP_REST_API_Product'))
                 {
                     $total_page = $products['total_page'];
                 }else{
-                    $total_page = 1;//$this->getTotalPageProduct();
+                    $total_page = 1;
                 }
                 
                 $data = array('total_page' => $total_page, 'current_page' => $current,'term'=>$term);
@@ -117,6 +115,7 @@ if(!class_exists('OP_REST_API_Product'))
                 {
                     $show_out_of_stock = true;
                 }
+                $cache_group = 'products_'.$pull_session;
                 foreach($products['posts'] as $_product)
                 {
                     if(is_a($_product, 'WP_Post'))
@@ -127,16 +126,16 @@ if(!class_exists('OP_REST_API_Product'))
                         $product_id = $_product->get_id();
                         $product = $_product;
                     }
-        
-                    $product_data = $this->woo_class->get_product_formatted_data($_product,$warehouse_id);
                     
+                    $product_data = $this->woo_class->get_product_formatted_data($_product,$warehouse_id,false,false,null,$cache_group);
+                
                     $allow = $this->warehouse_class->_allowProduct($product_data,$warehouse_id);
                     
                     if(!$allow || !$product_data)
                     {
                         continue;
                     }
-                   
+                    
                     if(!$show_out_of_stock)
                     {
                         if( $product_data['manage_stock'] &&  is_numeric($product_data['qty']) && $product_data['qty'] <= 0)
@@ -158,10 +157,17 @@ if(!class_exists('OP_REST_API_Product'))
                                 continue;
                             }
                         }
-                        
                     }
+                    $final_product = $this->_formatApiProduct($product_data,$session_data);
                    
-                    $data['products'][] = $this->_formatApiProduct($product_data,$session_data);
+                    $data['products'][] = $final_product;
+                        
+                    
+                    
+                }
+                if($current >= $total_page)
+                {
+                    wp_cache_flush_group( $cache_group );
                 }
                 $result['code'] = 200;
                 $result['response']['status'] = 1;

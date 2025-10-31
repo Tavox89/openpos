@@ -44,6 +44,12 @@ if(!class_exists('OP_REST_API_Auth'))
                     'permission_callback' => array($this,'permission_callback'),
                     ) 
                 );
+                register_rest_route( $this->namespace, '/auth/verify-pin', array(
+                    'methods' =>  WP_REST_Server::CREATABLE,
+                    'callback' => array($this,'verify_pin'),
+                    'permission_callback' => array($this,'permission_callback'),
+                    ) 
+                );
                 register_rest_route( $this->namespace, '/pos-state/(?P<local_timestamp>\d+)', array(
                     'methods' => WP_REST_Server::CREATABLE,
                     'callback' => array($this,'pos_state'),
@@ -663,6 +669,42 @@ if(!class_exists('OP_REST_API_Auth'))
             }
             return $this->rest_ensure_response($result);
         }
+        public function verify_pin(WP_REST_Request $request){
+            $result = array(
+                'code' => 'unknown_error',
+                'response' => array(
+                    'status' => 0,
+                    'data' => array(),
+                    'message' => __('Unknow message','openpos')
+                ),
+                'api_message' => ''
+            );
+            try{
+
+                $session_id = $request->get_param( 'session_id' );
+                $pin = $request->get_param( 'pin' );
+                if( !$pin)
+                {
+                    throw new Exception(__('PIN can not empty.','openpos' ));
+                }
+                $user = $this->woo_class->pin_authenticate($pin,false);
+                if ( is_wp_error($user) ) {
+                    
+                    throw new Exception($user->get_error_message());
+                }
+                $result['response']['data'] = apply_filters('op_verify_pin_data',array(
+                    'user_id' => $user->ID,
+                    'role' => array()
+                ));
+                $result['response']['status'] = 1;
+                $result['code'] = 200;
+            }catch(Exception $e){
+                $result['response']['message'] = strip_tags($e->getMessage());
+                $result['response']['status'] = 0;
+                $result['code'] = 400;
+            }
+            return $this->rest_ensure_response($result);
+        }
         public function logoff(WP_REST_Request $request){
             $response_code = 200;
             $result = array(
@@ -680,7 +722,7 @@ if(!class_exists('OP_REST_API_Auth'))
                 $result['response']['status'] = 1;
                 $result['code'] = 200;
             }catch(Exception $e){
-                $result['message'] = $e->getMessage();
+                $result['response']['message'] = $e->getMessage();
                 $result['response']['status'] = 0;
                 $result['code'] = 400;
             }
@@ -831,12 +873,14 @@ if(!class_exists('OP_REST_API_Auth'))
                                 //$tables[$table_id] = $table;
                             }
                         }
-                        $this->table_class->update_bill_screen($tables,true);
+                        $this->table_class->update_bill_screen($tables,true,'background');
                     }
 
                     $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
+
+                    $request_takeaway = $request->get_param('takeaway') ?  json_decode($request->get_param('takeaway'),true) : array();
                     
-                    $update_data = $this->table_class->get_all_update_data($warehouse_id,$last_check,$last_check_utc);
+                    $update_data = $this->table_class->get_all_update_data($request_takeaway,$warehouse_id,$last_check,$last_check_utc);
 
                     $tables_version = isset($update_data['tables_version']) ? $update_data['tables_version'] : array();
 
@@ -850,8 +894,7 @@ if(!class_exists('OP_REST_API_Auth'))
                         $desk_message = sprintf(__( 'There are new message from tables: %s', 'openpos' ),implode(',',$tables_desk_messages));
                         
                     }
-                    // $tables_version = $op_table->tables_version($warehouse_id);
-                    // $ready_dish = $op_table->ready_dishes($warehouse_id);
+                    
                 }
                 $notifications = $this->woo_class->getNotifications($last_check,$session_data);
 
