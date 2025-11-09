@@ -203,7 +203,7 @@ if(!class_exists('OP_REST_API_Product'))
                 {
                     $page = 1;
                 }
-                $database_version = get_option('_openpos_product_version_'.$login_warehouse_id,0);
+                $database_version = $this->core_class->getProductDbVersion($login_warehouse_id);
                 if($local_db_version > 0)
                 {
                     $per_page = 50;

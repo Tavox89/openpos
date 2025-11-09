@@ -281,7 +281,7 @@ if(!class_exists('OP_Woo_Order'))
 
         public function update_order_number($order_id,$is_hpos = false)
         {
-            $pos_sequential_number_enable = $this->settings_api->get_option('pos_sequential_number_enable','openpos_general');
+            $pos_sequential_number_enable = apply_filters('pos_sequential_number_enable',$this->settings_api->get_option('pos_sequential_number_enable','openpos_general'));
 
             if($pos_sequential_number_enable == 'yes')
             {
@@ -895,6 +895,13 @@ if(!class_exists('OP_Woo_Order'))
         public function woocommerce_account_dashboard(){
             $user_id = get_current_user_id();
             if (!$user_id) return;
+
+            $allow_laybuy = $this->settings_api->get_option('pos_laybuy','openpos_pos') == 'yes' ? true : false;
+
+            if(!$allow_laybuy)
+            {
+                return;
+            }
 
             // Example: Get total debit from user meta or your custom logic
             // Replace this with your actual logic to get the debit total

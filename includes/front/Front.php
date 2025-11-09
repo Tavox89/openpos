@@ -41,6 +41,7 @@ class Openpos_Front{
             $vars[] = 'openpos_sw';
             $vars[] = 'openpos_kitchen';
             $vars[] = 'openpos_bill';
+            $vars[] = 'openpos_queue';
             return $vars;
         });
         add_action('template_redirect', function() {
@@ -67,17 +68,30 @@ class Openpos_Front{
                 require_once trailingslashit(OPENPOS_DIR) . 'templates/front/bill.php';
                 exit;
             }
+            
+            if (get_query_var('openpos_queue')) {
+               
+                global $op_in_queue_screen;
+                $op_in_queue_screen = true;
+                $this->registerQueueScripts();
+                require_once trailingslashit(OPENPOS_DIR) . 'templates/front/queue.php';
+                exit;
+            }
             if (get_query_var('openpos_sw')) {
                 header('Content-Type: application/javascript');
                 readfile(OPENPOS_DIR . '/pos/service-worker.js');
                 exit;
             }
             
+
+            
+            
         });
         add_action('init', function() {
             $value = get_option('openpos_base', '');
             $openpos_kitchen_base_value = get_option('openpos_kitchen_base', '');
             $_openpos_bill_basevalue = get_option('openpos_bill_base', '');
+            $_openpos_queue_basevalue = get_option('openpos_queue_base', '');
             if($value)
             {
                 add_filter('redirect_canonical', function ($redirect_url, $requested_url) {
@@ -94,13 +108,20 @@ class Openpos_Front{
             if($openpos_kitchen_base_value)
             {
                 $openpos_kitchen_base_value = trim(esc_attr($openpos_kitchen_base_value),'/');
-                add_rewrite_rule("^{$openpos_kitchen_base_value}/?$', 'index.php?openpos_kitchen=1", 'top');
+                add_rewrite_rule("^{$openpos_kitchen_base_value}/?$", 'index.php?openpos_kitchen=1', 'top');
                 
             }
             if($_openpos_bill_basevalue)
             {
                 $_openpos_bill_basevalue = trim(esc_attr($_openpos_bill_basevalue),'/');
-                add_rewrite_rule("^{$_openpos_bill_basevalue}/?$', 'index.php?openpos_bill=1", 'top');
+                add_rewrite_rule('^{$_openpos_bill_basevalue}/?$', 'index.php?openpos_bill=1', 'top');
+                
+            }
+            if($_openpos_queue_basevalue)
+            {
+                $_openpos_queue_basevalue = trim(esc_attr($_openpos_queue_basevalue),'/');
+                
+                add_rewrite_rule("^{$_openpos_queue_basevalue}/?$", 'index.php?openpos_queue=1', 'top');
                 
             }
               
@@ -403,13 +424,14 @@ class Openpos_Front{
         wp_enqueue_style('openpos.kitchen.bootstrap', OPENPOS_URL.'/assets/css/bootstrap.css');
         wp_enqueue_style('openpos.kitchen.style',OPENPOS_URL.'/assets/css/kitchen.css',array('openpos.kitchen.bootstrap'),$info['Version']);
 
-
+        wp_enqueue_script('wp-util');
+        wp_enqueue_script('underscore');
         wp_enqueue_script('openpos.kitchen.nosleep', OPENPOS_URL.'/assets/js/NoSleep.min.js','',$info['Version']);
         wp_enqueue_script('openpos.kitchen.screenfull', OPENPOS_URL.'/assets/js/screenfull.min.js','',$info['Version']);
         wp_enqueue_script('openpos.kitchen.bootstrap', OPENPOS_URL.'/assets/js/bootstrap.js','',$info['Version']);
         wp_enqueue_script('openpos.kitchen.ejs', OPENPOS_URL.'/assets/js/ejs.js','',$info['Version']);
         wp_enqueue_script('openpos.kitchen.timeago', OPENPOS_URL.'/assets/js/jquery.timeago.js','',$info['Version']);
-        wp_register_script('openpos.kitchen.script',OPENPOS_URL.'/assets/js/kitchen.js',array('jquery','openpos.kitchen.ejs','openpos.kitchen.nosleep','openpos.kitchen.screenfull','openpos.kitchen.timeago','openpos.kitchen.bootstrap'),$info['Version']);
+        wp_register_script('openpos.kitchen.script',OPENPOS_URL.'/assets/js/kitchen.js',array('jquery','underscore','wp-util','openpos.kitchen.ejs','openpos.kitchen.nosleep','openpos.kitchen.screenfull','openpos.kitchen.timeago','openpos.kitchen.bootstrap'),$info['Version']);
     }
     public function registerCustomerScripts(){
         $info = $this->_core->getPluginInfo();
@@ -422,6 +444,25 @@ class Openpos_Front{
         wp_enqueue_script('openpos.customer.bootstrap', OPENPOS_URL.'/assets/bootstrap-v5.0.1/js/bootstrap.min.js','',$info['Version']);
         wp_enqueue_script('openpos.customer.accounting', OPENPOS_URL.'/assets/js/accounting.min.js','',$info['Version']);
         wp_register_script('openpos.customer.script',OPENPOS_URL.'/assets/js/customer.js',array('jquery','openpos.customer.ejs','openpos.customer.accounting'),$info['Version']);
+    }
+
+    public function registerQueueScripts(){
+        global $op_table;
+        $info = $this->_core->getPluginInfo();
+        $id = isset($_GET['id']) ? esc_attr($_GET['id']) : 0;
+        $url = $op_table->kitchen_data_url($id);
+        wp_enqueue_style('openpos.queue.style',OPENPOS_URL.'/assets/css/queue.css',array(),$info['Version']);
+
+        wp_enqueue_script( 'underscore' ); 
+        wp_enqueue_script( 'wp-util' ); 
+
+        wp_enqueue_script('openpos.kitchen.nosleep', OPENPOS_URL.'/assets/js/NoSleep.min.js','',$info['Version']);
+        wp_register_script('openpos.queue.script',OPENPOS_URL.'/assets/js/queue.js',array('jquery','openpos.kitchen.nosleep','wp-util','underscore'),$info['Version']);
+        wp_add_inline_script('openpos.queue.script',"
+                      var data_url = '".esc_url($url)."'; 
+                      var kitchen_frequency_time = 3000;
+                      var kitchen_no_orders = '".__('No orders in queue','openpos')."';
+         ",'before');
     }
 
     public function getApi(){
@@ -437,8 +478,9 @@ class Openpos_Front{
                 'framework'=>'woocommerce',
                 'woo_version'=> $this->_core->_woo_version_number(),
                 'version'=> $this->_core->_op_version_number(),
-                'params' => $_REQUEST
-            )
+                'params' => $_REQUEST,
+            ),
+            'server_time' => current_time('timestamp',true) * 1000
         );
         $api_action = isset($_REQUEST['pos_action']) ? esc_attr($_REQUEST['pos_action']) : '';
         $validate = false;
@@ -669,7 +711,7 @@ class Openpos_Front{
             }
         }
         
-        $result['database_version'] = get_option('_openpos_product_version_'.$warehouse_id,0);
+        $result['database_version'] = $this->_core->getProductDbVersion($warehouse_id);
         if($this->settings_api->get_option('pos_auto_sync','openpos_pos') == 'no')
         {
             $result['database_version'] = -1;
@@ -727,7 +769,7 @@ class Openpos_Front{
         $session_data = $this->_getSessionData();
         $login_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
         $local_db_version = isset($_REQUEST['local_db_version']) ? $_REQUEST['local_db_version'] : 0;
-        $database_version = get_option('_openpos_product_version_'.$login_warehouse_id,0);
+        $database_version =  $this->_core->getProductDbVersion($login_warehouse_id);
         if($local_db_version > 0)
         {
             $product_changed_data = $op_woo->getProductChanged($local_db_version,$login_warehouse_id);
@@ -1395,6 +1437,7 @@ class Openpos_Front{
     function add_transaction($transaction_data = array()){
         global $op_register;
         global $op_transaction;
+        global $op_session;
         $result = array('status' => 0, 'message' => '','data' => array());
         try{
             $session_data = $this->_getSessionData();
@@ -1410,8 +1453,8 @@ class Openpos_Front{
             if($transaction_id)
             {
                 
-                $transaction_data = get_transient($transient_key);
-                $done_transaction_data = get_transient($done_transient_key);
+                $transaction_data = $op_session->get_transient($transient_key);
+                $done_transaction_data = $op_session->get_transient($done_transient_key);
 
                 if ( false !== $transaction_data ) {
                     throw new Exception(__('Transaction is being processed. Please wait a moment.','openpos' ));
@@ -1437,7 +1480,7 @@ class Openpos_Front{
                         }
                     }
     
-                    set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
+                    $op_session->set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
                    
                     //start check transaction exist
                     $exist_transaction = $op_transaction->get_by_local_id($transaction_id);
@@ -1472,7 +1515,7 @@ class Openpos_Front{
                                 add_post_meta($id,'_add_balance_amount',$balance);
                             }
                         }
-                        set_transient( $done_transient_key, $id, HOUR_IN_SECONDS );
+                        $op_session->set_transient( $done_transient_key, $id, HOUR_IN_SECONDS );
                         $result['status'] = 1;
                         $result['data'] = $id;
                         if($is_new)
@@ -1481,7 +1524,7 @@ class Openpos_Front{
                         }
                         
                     }
-                    delete_transient( $transient_key );
+                    $op_session->delete_transient( $transient_key );
                 }
 
                 
@@ -3787,12 +3830,12 @@ class Openpos_Front{
                     if(strpos($table_id,'desk') !== false )
                     {
                         $_table_id = str_replace('desk-','',$table_id);
-                        $_old_tables[$table_id] = $op_table->bill_screen_data($_table_id);
+                        $_old_tables[$table_id] = $op_table->get_data($_table_id);
                     }
                     if(strpos($table_id,'takeaway') !== false )
                     {
                         $_table_id = str_replace('takeaway-','',$table_id);
-                        $_old_tables[$table_id] = $op_table->bill_screen_data($_table_id,'takeaway');
+                        $_old_tables[$table_id] = $op_table->get_data($_table_id,'takeaway');
                     }
                     //end old data
 
@@ -3839,11 +3882,11 @@ class Openpos_Front{
             }
             if(strpos($desk_id,'takeaway-') === 0)
             {
-                $desk_data = $op_table->bill_screen_data($desk_id);
+                $desk_data = $op_table->get_data($desk_id);
                 $result_data = $desk_data;
             }else{
                 
-                $desk_data = $op_table->bill_screen_data($desk_id);
+                $desk_data = $op_table->get_data($desk_id);
                 $items = isset($desk_data['items']) ? $desk_data['items'] : array();
                 $version = isset($desk_data['ver']) ? $desk_data['ver'] : 0;
                 $system_ver = isset($desk_data['system_ver']) ? $desk_data['system_ver'] : 0;
@@ -3895,7 +3938,7 @@ class Openpos_Front{
             }
             foreach($desk_ids as $desk_id)
             {
-                $desk_data = $op_table->bill_screen_data($desk_id);
+                $desk_data = $op_table->get_data($desk_id);
                 $items = isset($desk_data['items']) ? $desk_data['items'] : array();
                 $version = isset($desk_data['ver']) ? $desk_data['ver'] : 0;
                 $sys_version = isset($desk_data['system_ver']) ? $desk_data['system_ver'] : 0;
@@ -3939,6 +3982,7 @@ class Openpos_Front{
         global $op_table;
         $result = array('status' => 0, 'message' => '','data' => array());
         try{
+            $session_data = $this->_getSessionData();
             $desk_id = isset($_REQUEST['desk_number']) ? trim($_REQUEST['desk_number'],'#') : 0;
             $force = isset($_REQUEST['force_remove']) && $_REQUEST['force_remove'] == 'yes' ? true : false;
             if(!$desk_id)
@@ -3949,7 +3993,8 @@ class Openpos_Front{
             $allow = apply_filters('op_allow_remove_takeaway',true,$desk_id);
             if($allow)
             {
-                $op_table->removeJsonTable($desk_id,$force);
+                $warehouse_id = $session_data['login_warehouse_id'];
+                $op_table->removeJsonTable($desk_id,$force,$warehouse_id);
                 $result['status'] = 1;
             }else{
                 throw new Exception( __('You do not allow remove this','openpos')  );
@@ -5278,7 +5323,7 @@ class Openpos_Front{
                 'rate' => 1
             );
             $result['data']['table'] = $table;
-            $table_data = $op_table->bill_screen_data($table['id']);
+            $table_data = $op_table->get_data($table['id']);
             $result['data']['dishes'] = isset($table_data['items']) ? $table_data['items'] : array();
 
             $result = apply_filters('op_get_guest_login',$result,$session_data);

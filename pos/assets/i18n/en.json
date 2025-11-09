@@ -19,6 +19,7 @@
     "MSG_LOGIN_WELCOME": "Welcome back!",
     "MSG_LOGON_WELCOME": "Welcome {{staff}}",
     "MSG_PIN": "Enter your PIN",
+    "MSG_CHECKING": "Checking.... Please wait!",
     "SITE_URL_HINT": "Example: https://yoursite.com",
     "SITE_URL_SUGGESTION": "Please make sure you are install plugin before use this pos.",
     "GUIDE_MESSAGE_URL": "Enter your site url and click next.",
@@ -736,5 +737,28 @@
     "MSG_SEARCH_NO_KEYWORD": "Please enter keyword to search customer",
     "MSG_NO_ORDERS": "No orders found",
     "LABEL_LOAD_MORE" : "Load more ( {{current_page}}/{{total_page}} )"
+  },
+  "DAYS": {
+    "MON": "Monday",
+    "TUE": "Tuesday",
+    "WED": "Wednesday",
+    "THU": "Thursday",
+    "FRI": "Friday",
+    "SAT": "Saturday",
+    "SUN": "Sunday"
+  },
+  "MONTHS": {
+    "JAN": "January",
+    "FEB": "February",
+    "MAR": "March",
+    "APR": "April",
+    "MAY": "May",
+    "JUN": "June",
+    "JUL": "July",
+    "AUG": "August",
+    "SEP": "September",
+    "OCT": "October",
+    "NOV": "November",
+    "DEC": "December"
   }
 }

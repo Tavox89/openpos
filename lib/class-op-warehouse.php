@@ -714,9 +714,14 @@ if(!class_exists('OP_Warehouse'))
             {
                 $warehouse = $this->get($outlet_id);
                 $kitchen_url = isset($warehouse['kitchen_url']) ?  esc_url($warehouse['kitchen_url']) :  esc_url($OPENPOS_CORE->get_kitchen_url($warehouse['id'])); 
+                $queue_url = isset($warehouse['queue_url']) ?  esc_url($warehouse['queue_url']) :  esc_url($OPENPOS_CORE->get_queue_url(['id' =>$warehouse['id']])); 
                 $result[] = array(
                     'url' => $kitchen_url,
                     'label' => __('Kitchen Screen','openpos')
+                );
+                $result[] = array(
+                    'url' => $queue_url,
+                    'label' => __('Queue Screen','openpos')
                 );
                 $result[] = array(
                     'url' => 'javascript:void(0);',
@@ -779,6 +784,7 @@ if(!class_exists('OP_Warehouse'))
             }
             return __('Instore OpenPOS Product update success','openpos');
         }
+       
 
     }
 

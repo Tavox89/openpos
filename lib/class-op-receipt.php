@@ -724,7 +724,9 @@ if(!class_exists('OP_Receipt'))
             return $session_response_data;
         }
         public function generate_full_receipt_template($receipt,$type = ''){
-
+            global $shortcode_tags;
+            unset($shortcode_tags['order_barcode']);
+            unset($shortcode_tags['order_qrcode']);
             $setting = $receipt;
             $html_header = '';
             $receipt_padding_top = $setting['padding_top'];
@@ -752,6 +754,7 @@ if(!class_exists('OP_Receipt'))
             $html .= '</div>';
 
             $html_page_cut = '<p id="op-page-cut">&nbsp;</p>';
+
             
             return '<html><head>'.$html_header.'</head><body style="margin:0;">'.$html.$html_page_cut.'</body></html>';
         }

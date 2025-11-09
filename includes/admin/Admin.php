@@ -207,6 +207,13 @@ class Openpos_Admin{
                 'permalink',
                 'openpos_permalink_section'
             );
+            add_settings_field(
+                'openpos_queue_base',
+                __('Customer Queue base', 'openpos'),
+                array($this,'openpos_queue_base_field_callback'),
+                'permalink',
+                'openpos_permalink_section'
+            );
         }
         add_settings_field(
             'openpos_bill_base',
@@ -216,9 +223,6 @@ class Openpos_Admin{
             'openpos_permalink_section'
         );
 
-
-
-
         $this->admin_notice_init();
     }
     function openpos_kitchen_base_field_callback() { 
@@ -226,6 +230,12 @@ class Openpos_Admin{
         echo '<input type="text" name="openpos_kitchen_base" value="' . esc_attr($value) . '" class="regular-text code" />';
         echo '<p class="description">'.__('Example: <code>/kitchen</code>.Leave empty to use plain url','openpos').'</p>';
     }
+    function openpos_queue_base_field_callback() { 
+        $value = get_option('openpos_queue_base', '');
+        echo '<input type="text" name="openpos_queue_base" value="' . esc_attr($value) . '" class="regular-text code" />';
+        echo '<p class="description">'.__('Example: <code>/queue</code>.Leave empty to use plain url','openpos').'</p>';
+    }
+    
     function openpos_bill_base_field_callback() { 
         $value = get_option('openpos_bill_base', '');
         echo '<input type="text" name="openpos_bill_base" value="' . esc_attr($value) . '" class="regular-text code" />';
@@ -1731,6 +1741,7 @@ class Openpos_Admin{
         $params = $_REQUEST;
         $result = array('status' => 0, 'message' => '');
         $this->_nonce_check();
+        $select_warehouse_id = isset($params['select_warehouse_id']) ? (int)$params['select_warehouse_id'] : -1;
         if(isset($params['field']) && $params['field'] && isset($params['id']))
         {
                 $id = $params['id'];
@@ -1796,12 +1807,15 @@ class Openpos_Admin{
                     }
                 }
             }
-
-            $remove_instore = array_diff($all_store_ids,$in_store_ids);
-            foreach($remove_instore as $warehouse_id)
+            if($select_warehouse_id < 0)
             {
-                 $op_warehouse->remove_instore($warehouse_id,$id);
+                $remove_instore = array_diff($all_store_ids,$in_store_ids);
+                foreach($remove_instore as $warehouse_id)
+                {
+                    $op_warehouse->remove_instore($warehouse_id,$id);
+                }
             }
+            
             $result['status'] = 1;
         }
         do_action('stock_products_update_after',$params);
@@ -1949,7 +1963,7 @@ class Openpos_Admin{
                         'alt'    => $props['alt'],
                     ) );
                 }
-                $tmp['action'] = '<a href="javascript:void(0)" class="update-row" data-id="'.$product_id.'">'.__('Update','openpos').'</a>';
+                $tmp['action'] = '<a href="javascript:void(0)" class="update-row"  data-select_warehouse_id="'.$warehouse_id.'" data-id="'.$product_id.'">'.__('Update','openpos').'</a>';
 
                 if($type == 'variation')
                 {
@@ -1988,7 +2002,7 @@ class Openpos_Admin{
                     $price = 0;
                 }
 
-                $tmp['formatted_price'] = '<div class="vna-row-price row"><div class="col-md-8 text-right"><input type="text" value="'.$price.'" class="row-price-input form-control" /><div class="row-price-span">'.wc_price($price).'</div> </div><div class="col-md-4 text-left"> <a href="javascript:void(0)" data-id="'.$product_id.'" class="click-edit-price-a"><span class="glyphicon glyphicon-pencil"></span><span class="glyphicon glyphicon-saved"></span></a></div></div>';
+                $tmp['formatted_price'] = '<div class="vna-row-price row"><div class="col-md-8 text-right"><input type="text" value="'.$price.'" class="row-price-input form-control" /><div class="row-price-span">'.wc_price($price).'</div> </div><div class="col-md-4 text-left"> <a href="javascript:void(0)" data-select_warehouse_id="'.$warehouse_id.'" data-id="'.$product_id.'" class="click-edit-price-a"><span class="glyphicon glyphicon-pencil"></span><span class="glyphicon glyphicon-saved"></span></a></div></div>';
                 $qty = $_product->get_stock_quantity();
 
                 $stock_manager = $_product->get_manage_stock() ? 'yes' : 'no';
@@ -2530,18 +2544,26 @@ class Openpos_Admin{
             'compare' => '=',
         );
         
-        if(!empty($meta_query))
-        {
-            $args['meta_query'] = $meta_query;
-        }
+
+        
+        
 
 
         if($searchPhrase)
         {
-            $args['post__in'] = [$searchPhrase];
+            $meta_query[] =  array(
+                'key' => '_op_order_number_format',
+                'value' => ltrim($searchPhrase, '#'),
+                'compare' => 'LIKE',
+            );
+           // $args['post__in'] = [$searchPhrase];
         }
-
+        if(!empty($meta_query))
+        {
+            $args['meta_query'] = $meta_query;
+        }
         $final_args = apply_filters('admin_orders_args',$args );
+        
         if($this->_enable_hpos)
         {
             $args['_query_src'] = 'op_order_query';
@@ -3498,6 +3520,7 @@ class Openpos_Admin{
                         {
                             $limit_duration = false;
                         }
+                        $limit_duration = false;//test
                         
                         $ranges = $this->core->getReportRanges($report_duration,$gameFrom->toFormattedDateString('Y-m-d'),$gameTo->toFormattedDateString('Y-m-d'),0,$limit_duration);
                     }else{
@@ -5759,19 +5782,18 @@ class Openpos_Admin{
 
     public function _short_code()
     {
-        $is_pos = false;
+        $is_pos = false ;
         if(isset($_REQUEST['action']) && esc_attr($_REQUEST['action']) == 'openpos')
         {
             $is_pos = true;
+            
         }
         add_shortcode( 'barcode', array($this,'_barcode_img_func'));
         add_shortcode( 'op_product', array($this,'_product_barcode_func'));
-        if(!$is_pos)
-        {
-            add_shortcode( 'order_barcode', array($this,'_order_barcode_func'));
-            add_shortcode( 'order_qrcode', array($this,'_order_qrcode_func'));
-
-        }
+        
+        add_shortcode( 'order_barcode', array($this,'_order_barcode_func'));
+        add_shortcode( 'order_qrcode', array($this,'_order_qrcode_func'));
+       
         add_shortcode( 'op_warehouse', array($this,'_warehouse_func'));
 
         add_shortcode( 'op_register', array($this,'_register_func'));
@@ -7725,6 +7747,12 @@ class Openpos_Admin{
             update_option('openpos_kitchen_base', $value ?: '');
             $flush = true;
         }
+        if (isset($_POST['openpos_queue_base'])) {
+            
+            $value = wc_sanitize_permalink( wp_unslash( $_POST['openpos_queue_base'] ) ); 
+            update_option('openpos_queue_base', $value ?: '');
+            $flush = true;
+        }
         if (isset($_POST['openpos_bill_base'])) {
             $value = wc_sanitize_permalink( wp_unslash( $_POST['openpos_bill_base'] ) ); 
             update_option('openpos_bill_base', $value ?: '');
@@ -7732,7 +7760,7 @@ class Openpos_Admin{
         }
         if( $flush )
         {
-            flush_rewrite_rules(); // flush sau khi user lưu
+            flush_rewrite_rules(); 
         }
     }
     

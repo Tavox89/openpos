@@ -20,6 +20,9 @@ if(!class_exists('OP_REST_API'))
         protected $exchange_class;
 
         public function __construct($core_class = array()){
+            global $in_openpos_rest;
+            $in_openpos_rest = true;
+            
             if(isset($core_class['op_register']))
             {
                 $this->register_class = $core_class['op_register'];
@@ -79,6 +82,7 @@ if(!class_exists('OP_REST_API'))
             if ($request && !$this->check_auth_header($request)) {
                 return new WP_Error('op_rest_forbidden', __('Unauthorized', 'openpos'), array('status' => 0));
             }
+            do_action('op_before_rest_api',$request->get_route(),$this->session_data,$request);
             return true;
         }
         
@@ -129,8 +133,9 @@ if(!class_exists('OP_REST_API'))
             }
             if($warehouse_id !== false)
             {
-                $database_version = get_option('_openpos_product_version_'.$warehouse_id,0);
+                $database_version = $this->core_class->getProductDbVersion($warehouse_id);
                 $result['response']['database_version'] = 1*$database_version;
+                $result['response']['server_time'] = current_time('timestamp',true) * 1000; // in miliseconds
             }
             
             return rest_ensure_response( $result );
@@ -155,13 +160,13 @@ if(!class_exists('OP_REST_API'))
             $duration =  apply_filters('rest_api_limit_duration',120); // wait 120 seconds
 
 
-            $requests = get_transient($key);
+            $requests = $this->session_class->get_transient($key);
             if ($requests === false) {
                 $requests = 1;
-                set_transient($key, $requests, $duration);
+                $this->session_class->set_transient($key, $requests, $duration);
             } else {
                 $requests++;
-                set_transient($key, $requests, $duration);
+                $this->session_class->set_transient($key, $requests, $duration);
             }
 
             if ($requests > $limit) {

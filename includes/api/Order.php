@@ -105,6 +105,13 @@ if(!class_exists('OP_REST_API_Order'))
                 'permission_callback' => array($this,'permission_callback'),
                 ) 
             );
+            register_rest_route( $this->namespace, '/order/pending-order', array(
+                'methods' => WP_REST_Server::CREATABLE,
+                'callback' => array($this,'pending_order'),
+                'permission_callback' => array($this,'permission_callback'),
+                ) 
+            );
+            
 
         }
         public function orders($request)
@@ -518,8 +525,8 @@ if(!class_exists('OP_REST_API_Order'))
                             if($transaction_id)
                             {
                                
-                                $transaction_data = get_transient($transient_key);
-                                $done_transaction_data = get_transient($done_transient_key);
+                                $transaction_data = $this->session_class->get_transient($transient_key);
+                                $done_transaction_data = $this->session_class->get_transient($done_transient_key);
                                 
 
                                 if ( false === $transaction_data && false === $done_transaction_data ) {
@@ -538,7 +545,7 @@ if(!class_exists('OP_REST_API_Order'))
                                         }
                                     }
 
-                                    set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
+                                    $this->session_class->set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
                                 
                                     //start check transaction exist
                                     $exist_transaction = $this->transaction_class->get_by_local_id($transaction_id);
@@ -573,13 +580,13 @@ if(!class_exists('OP_REST_API_Order'))
                                                 add_post_meta($id,'_add_balance_amount',$balance);
                                             }
                                         }
-                                        set_transient( $done_transient_key, $id, DAY_IN_SECONDS );
+                                        $this->session_class->set_transient( $done_transient_key, $id, DAY_IN_SECONDS );
                                         if($is_new)
                                         {
                                             do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
                                         }
                                     }
-                                    delete_transient( $transient_key );
+                                    $this->session_class->delete_transient( $transient_key );
                                 }
                             }
                             
@@ -710,11 +717,7 @@ if(!class_exists('OP_REST_API_Order'))
                 $login_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
                 $order_id = $order_post_data['order_id'];
                 $order_number = isset($order_post_data['order_number']) ? $order_post_data['order_number'] : 0;
-
-                if(!$order_id)
-                {
-                    throw new Exception(__('Order Id is required','openpos'));
-                }
+                
                 $order = wc_get_order($order_id);
                 if($order_number && !$order )
                 {
@@ -981,7 +984,71 @@ if(!class_exists('OP_REST_API_Order'))
             }
             return $this->rest_ensure_response($result);
         }
-        
+        public function pending_order($request){
+            $result = array(
+                'code' =>'unknown_error',
+                'response' => array(
+                    'status' => 0,
+                    'data' => array(),
+                    'message' => ''
+                ),
+                'api_message' => ''
+            );
+            try{
+                $use_hpos = $this->core_class->enable_hpos();
+                $session_data = $this->session_data;
+                global $_op_warehouse_id;
+                $_op_warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
+                $order_data_json = $request->get_param('order');
+                $order_data = json_decode($order_data_json,true);
+
+                $payment_parse_data = json_decode($request->get_param('payment'),true);
+                $is_clear = false;
+            
+                $order_source = $request->get_param('source') ? $request->get_param('source') : 'sync';
+                $order_result = $this->_add_order($order_data,$order_source,$is_clear);
+                if(!$order_result['status'])
+                {
+                    throw new Exception($order_result['message']);
+                }
+                $order = wc_get_order($order_result['data']['order_id']);
+                $payment_data = apply_filters('op_pending_payment_method_data',$payment_parse_data,$order_result);
+                if(!empty($payment_data))
+                {
+                    if($use_hpos )
+                    {
+                        $order->update_meta_data('pos_payment',$payment_data);
+                    }else{
+                        add_post_meta($order_result['data']['order_id'],'pos_payment',$payment_data);
+                    }
+                    
+                }
+
+                do_action('op_pending_payment_order',$order,$payment_data);
+
+                
+               
+                $checkout_url = $order->get_checkout_payment_url();
+                $image_url = $this->core_class->generateQRcode($checkout_url,100,100);
+                $guide_html = '<div class="checkout-container">';
+                $guide_html .= '<p style="text-align: center" id="payment-qr-image"><img  src="'.$image_url.'" /></p>';
+                $guide_html .= '<p  style="text-align: center">Please checkout with scan QrCode or <a target="_blank" href="'.esc_url($checkout_url).'">click here</a> to continue checkout</p>';
+                $guide_html .= '</div>';
+                $result['response']['data']['checkout_guide']  = apply_filters('op_order_checkout_guide_data',$guide_html,$order,$payment_data);
+                $result['response']['data']['order']  = $order_result['data'];
+               
+                $result['response']['status'] = 1;
+                $result['code'] = 200;
+                
+            }catch(Exception $e)
+            {
+                $result['code'] = 400;
+                $result['response']['status'] = 0;
+                $result['message'] = $e->getMessage();
+                
+            }
+            return $this->rest_ensure_response($result);
+        }
         public function _formatApiOrderItem($item)
         {
             //$currency = $session_data['setting']['currency'];

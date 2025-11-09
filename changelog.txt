@@ -1,3 +1,7 @@
+- 29/10/2015 - 8.0.9.6
+   - add queue page, the place to customer can see their order in processsing
+   - add base link option
+   - fixed customer report bug
 - 13/10/2025 (8.0) - 8.0.3
    - new feature: cart multi tab, it help staff can ignore a customer without stuck queue. https://prnt.sc/dMx0dA9LRYWg
    - Change from ajax to restful api

@@ -10,6 +10,20 @@
         },
         stopSound: function () {
             $(".sound-player").remove();
+        },
+        generateItemView: function (data) { 
+            // const productTemplate = wp.template('item');
+            // console.log(productTemplate.html());
+             data['time_ago'] = $.timeago(data['order_timestamp']);
+            var template = ejs.compile($('#tmpl-item').html(), {});
+            var html = template(data);
+            return html;
+        },
+        generateOrderView: function (data) {
+            data['time_ago'] = $.timeago(data['order_timestamp']);
+            var template = ejs.compile($('#tmpl-order').html(), {});
+            var html = template(data);
+            return html;
         }
     });
 })(jQuery);
@@ -17,7 +31,8 @@
 (function($) {
     var total_item = 0;
     let lastCheck = 0;
-    var view_type = 'items';
+    let allow_sound = false;
+    var view_type = 'orders';
     let client_time_offset = new Date().getTimezoneOffset();
     let last_html_str = '';
     var table_column = 4;
@@ -27,8 +42,12 @@
     var total_page = 1;
     var current_page = 1;
     var current_orders = [];
+    var current_items = {};
     var last_version = 0;
     var hide_orders = {};
+    var item_keys = {};
+
+
 
     function getDataInit(callback){
 
@@ -48,14 +67,25 @@
                     $('body').addClass('processing');
                 },
                 success: function(response){
-                    //$('#kitchen-table-body').empty();
+                    
                     if(!response.code )
                     {
                         var list_html = '';    
                         var _index = 1;
-                        let selected_view_type = $('input[name="display"]').val();
+                        let selected_view_type = view_type;// $('input[name="display"]').val();
                         let selected_area = $('select[name="type"]').val();
                         let data_response = [];
+                        let old_order_length = Object.values(current_items).length;
+                        if(response['items'])
+                        {
+                            current_items =  response['items'][selected_area];
+                           
+                        }
+                        if(response['orders'])
+                        {
+                            current_orders =  response['orders'][selected_area];
+                        }
+                        let new_order_length = Object.values(current_items).length;
                         if(selected_view_type == 'items' && response['items'])
                         {
                             data_response = response['items'][selected_area];
@@ -65,12 +95,9 @@
                             data_response = response['orders'][selected_area];
                             current_orders = data_response;
                         }
-                        var template = ejs.compile(data_template['template'], {});
                         let max_version = 0;
                         for(var i in data_response)
                         {
-                            
-                            
                             var row_data = data_response[i];
                             if(selected_view_type == 'orders')
                             {
@@ -97,14 +124,13 @@
                             {
                                 row_data['done'] = 'ready';
                             }
-                            var html = template(row_data);
-                            list_html += html;
                             _index++;
                         }
                         
-                        if(_index > total_item)
+                        if(new_order_length > old_order_length)
                         {
                             $('body').trigger('new-dish-come');
+
                         }
                         total_item = _index;
                         let has_update = false;
@@ -120,11 +146,14 @@
                                 has_update = true;
                             }
                         }
+                         if(selected_view_type == 'items')
+                         {
+                            has_update = true;
+                         }
                         
                         if(has_update)
                         {
-                            $('#kitchen-table-body').html(list_html);
-                            last_html_str = list_html;
+                            viewInit();
                             order_item_size();
                         }
                         
@@ -234,6 +263,74 @@
         
     }
 
+
+
+    function viewInit(){
+        $('body').removeClass('body-orders');
+        $('body').removeClass('body-items');
+        $('body').addClass('body-'+view_type);
+        if(view_type == 'items')
+        {
+            let item_pending_html = '';
+            let item_ready_html = '';
+            for(current_item in current_items)
+            {
+                let item = current_items[current_item];
+                let html = $.generateItemView(item);
+            
+                if(item['done'] == 'ready')
+                {
+                    item_ready_html += html;
+                }else{
+                    item_pending_html += html;
+                }
+                
+                
+            }
+            
+
+            
+            let item_list_pending_html = '<div class="item-list-container pending-list">';
+            item_list_pending_html += '<div class="container-fluid">';
+    
+            item_list_pending_html += '<div class="col-md-12 col-lg-12 col-sm-12 col-xs-12 item-list">';
+            item_list_pending_html += '<div class="container">';
+            item_list_pending_html += item_pending_html;
+            item_list_pending_html += '</div>';
+            item_list_pending_html += '</div>';
+            item_list_pending_html += '</div>';
+            item_list_pending_html += '</div>';
+
+            let item_list_ready_html = '<div class="item-list-container ready-list">';
+            item_list_ready_html += '<div class="container-fluid">';
+            item_list_ready_html += '<div class="col-md-12 col-lg-12 col-sm-12 col-xs-12 item-group-list">';
+            item_list_ready_html += '<div class="container">';
+            item_list_ready_html += item_ready_html;
+            item_list_ready_html += '</div>';
+            item_list_ready_html += '</div>';
+            item_list_ready_html += '</div>';
+            item_list_ready_html += '</div>';
+
+
+
+            $('#kitchen-table-body').html(item_list_pending_html + item_list_ready_html);
+        }else{
+            let order_html = '<div id="bill-content-orders" class="bill-content-container"><div id="kitchen-table-body">';
+            for(current_order in current_orders)
+            {
+                let html = $.generateOrderView(current_orders[current_order]);
+                order_html += html;
+            }
+            order_html += '</div>';
+            order_html += '</div>';
+           
+            $('#kitchen-table-body').html(order_html);
+            order_item_size();
+        }
+       
+       
+    }
+
     $(document).ready(function(){
         screenSizeInit();
         $('select[name="type"]').on('change',function(){
@@ -325,14 +422,11 @@
         });
         $(document).on('click','.grid-view',function(){
             view_type = $(this).data('id');
-            $('input[name="display"]').val(view_type);
-            $('form#kitchen-form').submit();
-
-        //    $('.grid-view-control .grid-view').removeClass('selected');
-        //    $(this).addClass('selected');
-           
-        //    $('.bill-content-container').hide();
-        //    $('#bill-content-'+view_type).show();
+            $('.grid-view').removeClass('selected');
+            $(this).addClass('selected');
+            viewInit();
+            //$('input[name="display"]').val(view_type);
+            //$('form#kitchen-form').submit();
         });
         $(document).on('click','.page-item',function(){
             let page = current_page;
@@ -441,12 +535,7 @@
             }
             
         });
-        
-
     });
-
-
-    
     var is_nosleep = false;
     document.body.addEventListener("click", function () {
       if(!is_nosleep)

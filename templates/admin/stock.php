@@ -115,22 +115,24 @@ $columns = apply_filters('op_admin_template_stock_columns',$_columns);
             grid.find(".update-row").on("click", function(e)
             {
                 let _id = $(this).data("id");
+                let select_warehouse_id = $(this).data("select_warehouse_id");
                 var id = 'product-row-'+ _id;
                 var current_obj = $(this);
                 var form_data = grid.find('#'+id).serialize();
-                var addtion_data = new Array();
+                var addition_data = new Array();
+                addition_data.push('select_warehouse_id='+select_warehouse_id);
                 let row = $(this).closest('tr').first().find('.field-data-update').each(function(){
                     let name_field = $(this).attr('name');
                     if(name_field)
                     {
                         let tmp = name_field+'='+$(this).val();
-                        addtion_data.push(tmp);
+                        addition_data.push(tmp);
                     }
                     
                 });
-                if(addtion_data.length > 0)
+                if(addition_data.length > 0)
                 {
-                    form_data += '&'+addtion_data.join('&');
+                    form_data += '&'+addition_data.join('&');
                 }
                 $.ajax({
                     url: "<?php echo admin_url( 'admin-ajax.php' ); ?>",

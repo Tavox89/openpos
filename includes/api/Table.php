@@ -186,6 +186,9 @@ if(!class_exists('OP_REST_API_Table'))
                     {
                         $desk_type = $this->table_class->getDeskType($table);
 
+                        
+                        
+
                         //old data
                         $table_type = 'dine_in';
                         if(strpos($table_id,'desk') !== false )
@@ -220,8 +223,17 @@ if(!class_exists('OP_REST_API_Table'))
                         }
 
                         $_tables[$table_id] = $table;
+
+                        //delete cache
+                        $table_key = $_table_id;
+                        if($desk_type != 'dine_in')
+                        {
+                            $table_key = $desk_type.'-'.$_table_id;
+                        }
+                        
                     }
                 }
+                
                 do_action('op_upload_desk_after',$_tables,$this->table_class,$tables,$_old_tables,$session_data);
               
                 $result['response']['data'] = $this->table_class->update_bill_screen($_tables,$is_force);
@@ -321,16 +333,18 @@ if(!class_exists('OP_REST_API_Table'))
             );
             try{
 
-                $takeaway_id = $request->get_param('desk_number') ? trim($request->get_param('desk_number'),'#') : 0;
+                $takeaway_key = $request->get_param('desk_number') ? trim($request->get_param('desk_number'),'#') : 0;
                 $force = $request->get_param('force_remove')  == 'yes' ? true : false;
-                if(!$takeaway_id)
+                if(!$takeaway_key)
                 {
                     throw new Exception( __('Takeaway Not found','openpos')  );
                 }
-                $allow = apply_filters('op_allow_remove_takeaway',true,$takeaway_id);
+                $allow = apply_filters('op_allow_remove_takeaway',true,$takeaway_key);
                 if($allow)
                 {
-                    $this->table_class->removeJsonTable($takeaway_id,$force);
+                    $session_data = $this->session_data;
+                    $warehouse_id = $session_data['login_warehouse_id'];
+                    $this->table_class->removeJsonTable($takeaway_key,$force,$warehouse_id);
                     $result['response']['status'] = 1;
                 }else{
                     throw new Exception( __('You do not allow remove this','openpos')  );

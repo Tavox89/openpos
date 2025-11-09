@@ -1,9 +1,17 @@
-.item-note{
-    color:red;
+.container {
+    width: 100%;
+    margin: 0;
+    font-size: 13px;
+}
+.item-note {
+    color: red;
     font-style: italic;
-    font-size: 12px;
+    font-size: 13px;
 }
 /* Green - Yellow - Red */
+[class^="gradient_"] { /* Use attribute selector for gradients */
+    /* fallback if needed */
+}
 .gradient_0    {background: #57bb8a;}
 .gradient_5    {background: #63b682;}
 .gradient_10   {background: #73b87e;}
@@ -54,13 +62,21 @@ span.dining.takeaway{
     background: #005724;
     border-radius: 10px;
 }
+.grid-view:focus,
+.grid-view:active,
 .grid-view:hover{
-  
+    outline: none;
     text-decoration: none;
 }
 .grid-view{
     margin-right: 10px;
     text-decoration: none;
+    outline: none;
+    border: solid 1px #000;
+    padding: 5px 8px;
+    color: #000;
+    font-weight: bold;
+    border-radius: 3px;
 }
 .grid-view.selected{
     color:red;
@@ -197,10 +213,11 @@ span.dining.takeaway{
 .body-items #bill-content{
     overflow: auto;
 }
-.body-orders #bill-content{
+body #bill-content{
     background: #424242;
     overflow: hidden;
 }
+.item-row,
 .body-orders .order-container{
     background: #fff;
 }
@@ -291,7 +308,7 @@ ul.item-options-label li{
     position: absolute;
     width: 50px;
     right: 0px;
-    bottom: 10px;
+    bottom: 50%;
     background: #E91E63;
 }
 .page-menu,
@@ -369,7 +386,42 @@ body.menu-is-open{
         transform: rotate(359deg)
     }
 }
-
+.item-group-list,
+.item-list{
+   padding-top: 15px;
+   position: relative;
+}
+.item-list-container{
+    position:absolute;
+    top: 0;
+    bottom: 0;
+    overflow: auto;
+}
+.pending-list{
+    left: 0;
+    right: 50%;
+}
+.ready-list{
+    left: 50%;
+    right: 0;
+    color: green;
+}
+.item-action{
+    padding-top: 15px;
+}
+.item-row{
+    padding: 5px;
+    border-bottom: solid 1px #333;
+    list-style: none;
+}
+.item-qty{
+    font-weight: bold;
+    font-size: 15px;
+}
+.order-time{
+    font-size: 10px;
+    font-style: italic;
+}
 /*start darkmode*/
 body.dark-mode .order-container{
     background: #333;
@@ -415,4 +467,24 @@ body.dark-mode  .kitchen-order{
 }
 .modal-content{
     color:#000;
+}
+body.dark-mode  .order-action-click,
+body.dark-mode  .is_cook_ready{
+    color:#fff;
+}
+body.dark-mode .item-row{
+    background-color: #333;
+    color: #fff;
+    border-bottom: solid 1px #999;
+}
+body.dark-mode .ready-list .item-row{
+    color: #8bc34a;
+}
+body.dark-mode  .grid-view{
+    
+    border: solid 1px #fff;
+    color: #fff;
+}
+body.dark-mode  .grid-view.selected{
+    color: red;
 }

@@ -19,6 +19,7 @@ if(!class_exists('OP_Table'))
         public $_base_path;
         public $_cache_group = '_op_tables';
         public $_core;
+        public $_session;
         public function __construct($base_path = '')
         {
             if(!class_exists('WP_Filesystem_Direct'))
@@ -27,6 +28,7 @@ if(!class_exists('OP_Table'))
                 require_once(ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php');
             }
             $this->_core = new Openpos_Core();
+            $this->_session =  new OP_Session();
             $this->_filesystem = new WP_Filesystem_Direct(false);
             if(!$base_path)
             {
@@ -109,6 +111,7 @@ if(!class_exists('OP_Table'))
             {
                 $this->_filesystem->mkdir($this->_bill_data_path_deleted,$chmod_dir);
             }
+            
             add_action('openpos_logout',array($this,'openpos_logout'),20,2);
             add_action('op_add_order_after',array($this,'op_add_order_after'),20,2);
             add_action('op_upload_desk_after',array($this,'op_upload_desk_after'),20,5);   
@@ -154,6 +157,7 @@ if(!class_exists('OP_Table'))
                 $cache_key = 'op_tables_'.$warehouse_id;
                 $cache_group = $this->_cache_group;
                 $cached_data = wp_cache_get( $cache_key, $cache_group );
+               
                 if ( false !== $cached_data )
                 {
                     $result =  $cached_data;
@@ -167,7 +171,6 @@ if(!class_exists('OP_Table'))
                         'meta_key' => $this->_position_meta_key,
                         'orderby'   => 'meta_value_num'
                     ]);
-    
                     foreach($posts as $p)
                     {
                         $tmp = $this->get($p->ID);
@@ -176,6 +179,7 @@ if(!class_exists('OP_Table'))
                             $result[] = $tmp;
                         }
                     }
+                    
                     wp_cache_set( $cache_key, $result, $cache_group );
                 }
             }else{
@@ -194,10 +198,6 @@ if(!class_exists('OP_Table'))
                 }
             }
             
-           
-
-            
-
            
             return $result;
         }
@@ -501,6 +501,7 @@ if(!class_exists('OP_Table'))
                     }
                     
                     $current_data = $this->get_data($_table_id,$table_type);
+                   
                     
                     $desk = isset($table_data['desk']) ? $table_data['desk'] : array();
                     
@@ -525,26 +526,22 @@ if(!class_exists('OP_Table'))
                         $allow_update = true;
                     }else{
                         if($table_sys_version < $current_sys_version)
-                        { 
-    
+                        {
+                            $allow_update = false;
                             throw new Exception(__('There are an other update of this table. Please refresh this table and try again. new:'.$table_sys_version .'- old:'. $current_sys_version,'openpos'));
                         }
-                        if(isset($current_data['ver']) && isset($table_data['ver']))
-                        {
-                            if($current_data['ver'] >= $table_data['ver']  )
-                            {
-                                $allow_update = false;
-                            }
-    
-                        }
+                        
                         
                     }
                     
                    
                     $_table_data = apply_filters('op_update_table_data',$table_data,$current_data);
+
+                  
                     
                     $_allow_update = apply_filters('op_get_allow_update_table_data',$allow_update,$table_data,$current_data);
                     $result[$table_key] = $current_data;
+                    
                     if($_allow_update)
                     {
                         if($source != 'background')
@@ -552,7 +549,7 @@ if(!class_exists('OP_Table'))
                             $_table_data['system_ver'] =  $server_time;
                         }
                         $allow_update_kitchen = true;
-                        
+                       
                         $this->update_data($_table_data,$_table_id,$table_type,$outlet_id);
                         
                         $result[$table_key] = $_table_data;
@@ -561,7 +558,7 @@ if(!class_exists('OP_Table'))
                 }
                 if($outlet_id  >= 0 && $allow_update_kitchen )
                 {
-                     
+                    
                     $this->update_kitchen_data($outlet_id);
                 }
 
@@ -650,7 +647,7 @@ if(!class_exists('OP_Table'))
             }
             return $this->_bill_data_path_deleted.'/'.$outlet_id.'/'.$process_name;
         }
-        public function removeJsonTable($table_id,$force = false){
+        public function removeJsonTable($table_id,$force = false,$outlet_id = -1){
             $table_type = 'dine_in';
             $_table_id = str_replace('desk-','',$table_id);
             $table_key = $table_id;
@@ -664,21 +661,18 @@ if(!class_exists('OP_Table'))
             
             
             $desk = isset($table_data['desk']) ? $table_data['desk'] : array();
-            $outlet_id = -1;
-            if(!empty($desk))
-            {
-                $outlet_id = isset($desk['warehouse']) ? $desk['warehouse'] : -1;
-                if($outlet_id == -1){
-                    $outlet_id = isset($desk['warehouse_id']) ? $desk['warehouse_id'] : 0;    
-                    }
-            }
-
+           
             do_action('op_remove_json_table_before',$table_data,$outlet_id);
 
             $this->remove_data($_table_id,$table_type);
-
+            if($table_type == 'takeaway')
+            {
+             
+                $this->remove_takeaway($_table_id,$outlet_id);
+            }
             if($outlet_id >= 0)
             {
+                
                 $this->update_kitchen_data($outlet_id);
             }
         }
@@ -692,7 +686,7 @@ if(!class_exists('OP_Table'))
                 $takeaways = $this->takeaways($warehouse_id);
                 $guest_takeaways = $this->guest_takeaways($warehouse_id);
                 
-                $exist_tables = array();
+                //$exist_tables = array();
                 foreach($tables as $t)
                 {
                     //$exist_tables[] = $t['id'];
@@ -834,7 +828,7 @@ if(!class_exists('OP_Table'))
                 $table_ids[] = $t['id'];
             }
 
-            //$request_takeaway = isset($_REQUEST['takeaway']) ?  json_decode(stripslashes($_REQUEST['takeaway']),true) : array();
+           
             
 
             $tables_version = array();
@@ -983,26 +977,35 @@ if(!class_exists('OP_Table'))
             if($warehouse_id >= 0)
             {
                 $off_tables = $this->tables((int)$warehouse_id);
-                $takeaway_tables =  $this->takeaways((int)$warehouse_id);// $this->takeawayTables((int)$warehouse_id);
+                $takeaway_tables =  $this->takeaways((int)$warehouse_id);
                 $guest_takeaways =  $this->guest_takeaways((int)$warehouse_id);
                 $tables = array(
-                    'dine_in' => $off_tables,
-                    'takeaway' => $takeaway_tables,
-                    'guest_takeaway' => $guest_takeaways
+                     'dine_in' => $off_tables,
+                     'takeaway' => $takeaway_tables,
+                     'guest_takeaway' => $guest_takeaways
                 );
-            
+
+           
+               
                 foreach($tables as $table_type => $_tables)
                 {
                     
                     foreach($_tables as $table)
                     {
+
+                        
                         if($table_type == 'dine_in')
                         {
-                            $table_data = $this->get_data($table['id'],$table_type,$warehouse_id);
-                           
+                            
+                            $table_id = $table['id'];
+                            $table_data = $this->get_data( $table_id,$table_type,$warehouse_id);
                         }else{
-                            $table_data = $this->get_data($table,$table_type,$warehouse_id);
+                            
+                            $table_id = $table;
+                            $table_data = $this->get_data( $table_id,$table_type,$warehouse_id);
                         }
+                        
+                       
                         if(isset($table_data['parent']) && $table_data['parent'] == 0 && isset($table_data['items'])  && count($table_data['items']) > 0)
                         {
                             $items = $table_data['items'];
@@ -1053,7 +1056,8 @@ if(!class_exists('OP_Table'))
                                     {
                                         $order_time = date('d-m-y  h:i',$timestamp);
                                     }
-                                    $dish_id = $id.'-'.$table['id'];
+                                    
+                                    $dish_id = $id.'-'. $table_id;
                                     if($table_type && $table_type != 'dine_in')
                                     {
                                         $dish_id.= '-'.$table_type;
@@ -1076,15 +1080,17 @@ if(!class_exists('OP_Table'))
                                         }
                                     }
 
-
+                                    
+                                    
                                     $tmp = array(
                                         'id' => $dish_id,
                                         'local_id' => $id ,
+                                        'product_id' => $product_id ,
                                         'priority' => 1,
                                         'item' => $item['name'],
                                         'seller_name' => $item['seller_name'] ? $item['seller_name'] : '',
                                         'qty' => $item['qty'],
-                                        'table' => $table['name'],
+                                        'table' => isset($table_data['label']) ? $table_data['label'] : (isset($table_data['desk']['name']) ? $table_data['desk']['name'] : ''),
                                         'order_time' => $order_time,
                                         'order_timestamp' => $order_timestamp,
                                         'note' => $item_note,
@@ -1094,6 +1100,9 @@ if(!class_exists('OP_Table'))
                                         'allow_action' => array(),
                                         'kitchen_area' => $item_kitchen_area,
                                     );
+                                    $item_key = md5(json_encode(array('product_id'=> $tmp['product_id'],'name'=> $tmp['item'],'note'=> $tmp['note'],'order_note'=> $tmp['order_note'],'dining'=> $tmp['dining'])));
+
+                                    $tmp['item_key'] = $item_key;
                                     
                                     $dish_data = apply_filters('op_kitchen_dish_item_data',$tmp,$table_data,$item);
                                     if($dish_data && !empty($dish_data) )
@@ -1149,6 +1158,7 @@ if(!class_exists('OP_Table'))
             }
 
             
+           
             
             foreach($result_orders as $a => $_result_orders)
             {
@@ -1201,6 +1211,8 @@ if(!class_exists('OP_Table'))
            
             $final_kitchen_data = apply_filters('op_kitchen_tables_data',$kitchen_data,$outlet_id,$this);
             
+           
+
             $file_mode = $this->get_file_mode();
             
             
@@ -1209,9 +1221,7 @@ if(!class_exists('OP_Table'))
                 json_encode($final_kitchen_data),
                 $file_mode // predefined mode settings for WP files
             );
-            $cache_group = 'openpos';
-            $cache_key = 'op_kitchen_'.$outlet_id;
-            wp_cache_delete($cache_key, $cache_group );
+            
         }
         public function removed_deleted_markup($warehouse_id = 0,$table_id = ''){
             // $deleted_files = array();
@@ -1350,13 +1360,10 @@ if(!class_exists('OP_Table'))
                                     }
                                     $paid_items[] = $item;
                                     $transient_key = 'table_stock_'.$deks_id.'_'.$product_id;
-                                    delete_transient($transient_key);
+                                    $this->_session->delete_transient($transient_key);
                                 }
-                                
-                                
                                 if(empty($ignore_items))
                                 {
-                                    
                                     if($clear_desk)
                                     {
                                         //reset table data
@@ -1398,6 +1405,10 @@ if(!class_exists('OP_Table'))
             $has_update = [];
             $warehouse_id = isset($session_data['login_warehouse_id']) ? $session_data['login_warehouse_id'] : 0;
             foreach($_old_tables as $table){
+                if(!isset($table['id']))
+                {
+                    continue;
+                }
                 $table_id = $table['id'];
                 $items = isset($table['items']) ? $table['items'] : array();
                 if(!empty($items))
@@ -1430,7 +1441,7 @@ if(!class_exists('OP_Table'))
                     {
                         $new_item_ids[] = $item_id;
                         $transient_key = 'table_stock_'.$table_id.'_'.$product_id;
-                        $current_qty = get_transient($transient_key);
+                        $current_qty = $this->_session->get_transient($transient_key);
                         if($current_qty === false)
                         {
                             $current_qty = 0;
@@ -1451,7 +1462,7 @@ if(!class_exists('OP_Table'))
                         if($item_update)
                         {
                             $current_qty += $qty;
-                            set_transient ($transient_key, $current_qty, HOUR_IN_SECONDS);
+                            $this->_session->set_transient ($transient_key, $current_qty, HOUR_IN_SECONDS);
                             $has_update[] = $product_id;
                         }
                     }
@@ -1470,7 +1481,7 @@ if(!class_exists('OP_Table'))
                         $product_id = $old_items[$item_id]['product_id'];
                         $qty = $old_items[$item_id]['qty'];
                         $transient_key = 'table_stock_'.$table_id.'_'.$product_id;
-                        $current_qty = get_transient($transient_key);
+                        $current_qty = $this->_session->get_transient($transient_key);
                         if($current_qty === false)
                         {
                             $current_qty = 0;
@@ -1478,9 +1489,9 @@ if(!class_exists('OP_Table'))
                         $current_qty -= $qty;
                         if($current_qty > 0)
                         {
-                            set_transient ($transient_key, $current_qty, HOUR_IN_SECONDS);
+                            $this->_session->set_transient ($transient_key, $current_qty, HOUR_IN_SECONDS);
                         }else{
-                            delete_transient( $transient_key );
+                            $this->_session->delete_transient( $transient_key );
                         }
                         $has_update[] = $product_id;
                     }
@@ -1506,7 +1517,7 @@ if(!class_exists('OP_Table'))
             {
                 $table_id = $table['id'];
                 $transient_key = 'table_stock_'.$table_id.'_'.$product_id;
-                $current_qty = get_transient($transient_key);
+                $current_qty = $this->_session->get_transient($transient_key);
                 if($current_qty === false)
                 {
                     $current_qty = 0;
@@ -1519,7 +1530,7 @@ if(!class_exists('OP_Table'))
                 $table_id = $table['id'];
                 $table_id = $table['id'];
                 $transient_key = 'table_stock_'.$table_id.'_'.$product_id;
-                $current_qty = get_transient($transient_key);
+                $current_qty = $this->_session->get_transient($transient_key);
                 if($current_qty === false)
                 {
                     $current_qty = 0;
@@ -1535,10 +1546,11 @@ if(!class_exists('OP_Table'))
             {
                 $table_key = $type.'-'.$table_id;
             }
+            
             $cache_group = $this->_cache_group;
             $cache_key = 'op_table_'.$outlet_id.'_'.$table_key;
             $cached_data = wp_cache_get( $cache_key, $cache_group );
-            if ( false !== $cached_data && false )
+            if ( false !== $cached_data  )
             {
                 $result = $cached_data;
             }else{
@@ -1555,7 +1567,7 @@ if(!class_exists('OP_Table'))
             {
                 $table_key = $type.'-'.$table_id;
             }
-
+           
             $cache_group = $this->_cache_group;
             $cache_key = 'op_table_'.$outlet_id.'_'.$table_key;
 
@@ -1592,10 +1604,7 @@ if(!class_exists('OP_Table'))
             if($type == 'guest_takeaway')
             {
                 $this->add_takeaway($table_id,$outlet_id,true);
-            }   
-       
-            
-
+            }  
             wp_cache_delete($cache_key, $cache_group );
             do_action('op_update_table_data_after',$data,$table_id,$type,$outlet_id,$this);
         }
@@ -1612,7 +1621,7 @@ if(!class_exists('OP_Table'))
             $table_data = $this->get_data($table_id,$type);
 
             $transient_key = 'op_table_deleted_'.$outlet_id.'_'.$type.'_'.$table_id;
-            set_transient ($transient_key, $table_data, WEEK_IN_SECONDS);
+            $this->_session->set_transient ($transient_key, $table_data, WEEK_IN_SECONDS);
 
             $file_path = $this->bill_screen_file_path($table_key);
             if(file_exists($file_path))
@@ -1624,7 +1633,7 @@ if(!class_exists('OP_Table'))
         }
         public function is_deleted($table_id,$type='dine_in',$outlet_id=0){
             $transient_key = 'op_table_deleted_'.$outlet_id.'_'.$type.'_'.$table_id;
-            $transient_value = get_transient($transient_key);
+            $transient_value = $this->_session->get_transient($transient_key);
             return ($transient_value !== false);
         }
         //save takeaway and guest takeaway list to transient
@@ -1635,7 +1644,7 @@ if(!class_exists('OP_Table'))
             {
                 $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
             }
-            $transient_value = get_transient($transient_key);
+            $transient_value = $this->_session->get_transient($transient_key);
             if($transient_value !== false)
             {
                 $result = $transient_value;
@@ -1644,7 +1653,7 @@ if(!class_exists('OP_Table'))
             {
                 $result[] = $takeaway_id;
             }
-            set_transient ($transient_key, $result, WEEK_IN_SECONDS);
+            $this->_session->set_transient ($transient_key, $result, WEEK_IN_SECONDS);
             return $result;
         }
         public function remove_all_takeaway($outlet_id,$is_guest = false){
@@ -1653,7 +1662,7 @@ if(!class_exists('OP_Table'))
             {
                 $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
             }
-            delete_transient( $transient_key );
+            $this->_session->delete_transient( $transient_key );
         }
         public function remove_takeaway($takeaway_id,$outlet_id,$is_guest = false){
             $result = array();
@@ -1662,7 +1671,7 @@ if(!class_exists('OP_Table'))
             {
                 $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
             }
-            $transient_value = get_transient($transient_key);
+            $transient_value = $this->_session->get_transient($transient_key);
             if($transient_value !== false)
             {
                 $result = $transient_value;
@@ -1673,13 +1682,13 @@ if(!class_exists('OP_Table'))
                 unset($result[$key]);
                 $result = array_values($result);
             }
-            set_transient ($transient_key, $result, WEEK_IN_SECONDS);
+            $this->_session->set_transient ($transient_key, $result, WEEK_IN_SECONDS);
             return $result;
         }
         public function takeaways($outlet_id){
             $result = array();
             $transient_key = 'op_all_takeaway_'.$outlet_id;
-            $transient_value = get_transient($transient_key);
+            $transient_value = $this->_session->get_transient($transient_key);
             if($transient_value !== false)
             {
                 $result = $transient_value;
@@ -1689,14 +1698,13 @@ if(!class_exists('OP_Table'))
         public function guest_takeaways($outlet_id){
             $result = array();
             $transient_key = 'op_all_guesttakeaway_'.$outlet_id;
-            $transient_value = get_transient($transient_key);
+            $transient_value = $this->_session->get_transient($transient_key);
             if($transient_value !== false)
             {
                 $result = $transient_value;
             }
             return $result;
         }
-        //
     }
 }
 ?>

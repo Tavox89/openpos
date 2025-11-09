@@ -734,5 +734,28 @@
     "MSG_SEARCH_NO_KEYWORD": "Vui lòng nhập từ khóa để tìm kiếm khách hàng",
     "MSG_NO_ORDERS": "Không tìm thấy đơn hàng nào",
     "LABEL_LOAD_MORE": "Tải thêm ( {{current_page}}/{{total_page}} )"
+  },
+  "DAYS": {
+    "MON": "Thứ Hai",
+    "TUE": "Thứ Ba",
+    "WED": "Thứ Tư",
+    "THU": "Thứ Năm",
+    "FRI": "Thứ Sáu",
+    "SAT": "Thứ Bảy",
+    "SUN": "Chủ Nhật"
+  },
+  "MONTHS": {
+    "JAN": "Tháng Một",
+    "FEB": "Tháng Hai",
+    "MAR": "Tháng Ba",
+    "APR": "Tháng Tư",
+    "MAY": "Tháng Năm",
+    "JUN": "Tháng Sáu",
+    "JUL": "Tháng Bảy",
+    "AUG": "Tháng Tám",
+    "SEP": "Tháng Chín",
+    "OCT": "Tháng Mười",
+    "NOV": "Tháng Mười Một",
+    "DEC": "Tháng Mười Hai"
   }
 }

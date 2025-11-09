@@ -374,13 +374,13 @@ if(!class_exists('OP_Report'))
                 $laybuy_order_status = 'wc-'.$laybuy_order_status;
                 if($report_register_id > 0)
                 {
-                        //$sales = $this->_core->getPosRegisterOrderByDate($report_register_id,$from,$to,array($laybuy_order_status));
+                        
                         $sales = $this->_core->getDebtByDate($from,$to,array($laybuy_order_status),-1,$report_register_id); //dev
                 }elseif($report_outlet_id >= 0){
-                        //$sales = $this->_core->getPosWarehouseOrderByDate($report_outlet_id,$from,$to,array($laybuy_order_status));
+                        
                         $sales = $this->_core->getDebtByDate($from,$to,array($laybuy_order_status),$report_outlet_id,0); //dev
                 }else{
-                       // $sales = $this->_core->getPosOrderByDate($from,$to,array($laybuy_order_status));
+                     
                        $sales = $this->_core->getDebtByDate($from,$to,array($laybuy_order_status)); //dev
                 }
 

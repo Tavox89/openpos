@@ -205,6 +205,8 @@ if(!class_exists('OP_REST_API_Auth'))
             $incl_tax_mode = $this->woo_class->inclTaxMode() == 'yes' ? true : false;
             $setting = $this->woo_class->_formatSetting($setting);
             $setting = $this->core_class->formatReceiptSetting($setting,$incl_tax_mode);
+
+           
             
             return $setting;
         }
@@ -834,14 +836,14 @@ if(!class_exists('OP_REST_API_Auth'))
                 'response' => array(
                     'status' => 0,
                     'data' => array(),
-                    'message' => ''
+                    'message' => '',
                 ),
                 'api_message' => ''
             );
             try{
                 $session_data = $this->session_data;
                 $last_check = $request->get_param('last_check') ? $request->get_param('last_check') : 0; // in miliseconds
-                $client_time_offset = isset($session_data['client_time_offset']) ? $session_data['client_time_offset'] : 0;
+                //$client_time_offset = isset($session_data['client_time_offset']) ? $session_data['client_time_offset'] : 0;
                 $last_check_utc = $last_check ;//+ $client_time_offset * 60 * 1000;
                 
                 if($last_check == 0 && isset($session_data['logged_time']))
@@ -857,7 +859,9 @@ if(!class_exists('OP_REST_API_Auth'))
                 $ready_dish = array();
                 $deleted_takeaway = array();
                 $desk_message = '';
-                if($this->setting_class->get_option('openpos_type','openpos_pos') == 'restaurant' )
+                $openpos_type = isset($session_data['setting']['openpos_type']) ? $session_data['setting']['openpos_type'] : $this->setting_class->get_option('openpos_type','openpos_pos');    
+                
+                if($openpos_type == 'restaurant' )
                 {
                     $tables = $request->get_param('tables') ? json_decode($request->get_param('tables'),true) : array();
                     

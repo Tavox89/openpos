@@ -164,6 +164,23 @@ class OP_Woo{
         add_filter('woocommerce_debug_tools',array($this,'woocommerce_debug_tools'),10,1);
     }
     public function woocommerce_debug_tools($tools){
+        $tools['op_clear_cache'] = array(
+            'name'   => __( 'Clear OpenPOS Cache', 'openpos' ),
+            'button' => __( 'Clear Cache', 'openpos' ),
+            'desc'   => sprintf(
+                __( 'manual clear OpenPOS transient cache.', 'openpos' )
+            ),
+            'callback' => array( $this, 'clear_all_transient_cache' ),
+        );
+        $tools['op_clear_expired_cache'] = array(
+            'name'   => __( 'Clear OpenPOS Expired Cache', 'openpos' ),
+            'button' => __( 'Clear Expired Cache', 'openpos' ),
+            'desc'   => sprintf(
+                __( 'manual clear OpenPOS expired transient cache.', 'openpos' )
+            ),
+            'callback' => array( $this, 'clear_expired_transient_cache' ),
+        );
+        
         $tools['op_clear_product_cache'] = array(
             'name'   => __( 'Clear OpenPOS product Cache', 'openpos' ),
             'button' => __( 'Clear Cache', 'openpos' ),
@@ -2517,7 +2534,7 @@ class OP_Woo{
                 'data' => array(),
                 'found_posts' => 0
         );
-        $db_version = get_option('_openpos_product_version_'.$warehouse_id,0);
+        $db_version = $this->_core->getProductDbVersion($warehouse_id);
         $found_posts = (int) $wpdb->get_var( $wpdb->prepare("SELECT FOUND_ROWS()") );
         if($found_posts  < $per_page )
         {
@@ -2538,7 +2555,8 @@ class OP_Woo{
         }
         if($db_version < $result['current_version'])
         {
-            update_option('_openpos_product_version_'.$warehouse_id,$result['current_version']);
+            $this->_core->setProductDbVersion($warehouse_id,$result['current_version']);
+            
         }
         
         return $result;
@@ -3480,11 +3498,11 @@ class OP_Woo{
                             'id' =>  $_item->get_id(),
                         ),
                         'item_type' => '',
-                        'price' => ($_refund_total /$refund_qty),
+                        'price' => $refund_qty != 0 ? ($_refund_total /$refund_qty) : $_refund_total ,
                         'qty' => $refund_qty,
                         'refund_total' => $_refund_total,
                         'refund_total_incl_tax' => $_refund_total + $_refund_total_tax,
-                        'tax' => ($_refund_total_tax /$refund_qty) ,
+                        'tax' =>  $refund_qty != 0 ? ($_refund_total_tax /$refund_qty) : 0 ,
                         'tax_total' => $_refund_total_tax,
 
                     );
@@ -3510,14 +3528,23 @@ class OP_Woo{
             }
         }
         $callback_data = array();
+        $order_number_format = $order->get_order_number();
+        if($tmp_order_number_format = $order->get_meta('_op_order_number_format'))
+        {
+            $order_number_format = $tmp_order_number_format;
+        }
+        if($tmp_order_number = $order->get_meta('_op_order_number'))
+        {
+            $order_number = $tmp_order_number;
+        }
         $result = array(
             'id' => $order_id,
             'order_id' => $order_id,
             'system_order_id' => $order_id,
             'pos_order_id' => $_pos_order_id,
             'order_number' => $order_number,
-            'order_number_format' => $order->get_order_number(),
-            'order_number_details' => array('order_id'=> $order_id, 'order_number' => $order_number,'order_number_format' => $order->get_order_number() ),
+            'order_number_format' => $order_number_format,
+            'order_number_details' => array('order_id'=> $order_id, 'order_number' => $order_number,'order_number_format' => $order_number_format ),
             'register' => $register,
             'title' => '',
             'addition_information' => $addition_information,
@@ -4694,35 +4721,28 @@ class OP_Woo{
         
     }
     public function getNotifications($from_time = 0,$session_data = array()){
-        $from_time = ceil($from_time / 1000);
+        $from_time = ceil($from_time / 1000); //server time
         $notifications = array();
-        /*
-        $notifications = array(
-                'message' => "test item nao",
-                'items' => array(
-                    array('type' => 'orders','id'=> rand() )
-                )
-            );
-            */
+        
         $wc_date = new WC_DateTime();
         
-        if(!$this->_enable_hpos)
-        {
-            if ( get_option( 'timezone_string' ) ) {
-                $wc_date->setTimezone( new DateTimeZone( wc_timezone_string() ) );
-            } else {
-                $wc_date->set_utc_offset( wc_timezone_offset() );
-            }
-        }
+        // if(!$this->_enable_hpos)
+        // {
+        //     if ( get_option( 'timezone_string' ) ) {
+        //         $wc_date->setTimezone( new DateTimeZone( wc_timezone_string() ) );
+        //     } else {
+        //         $wc_date->set_utc_offset( wc_timezone_offset() );
+        //     }
+        // }
        
         $wc_date->setTimestamp($from_time);
         $date_string = $wc_date->date("Y-m-d H:i:s");
-        
             
         $post_type = 'shop_order';
         $args = array(
             'date_query' => array(
-                'after'  =>  $date_string
+                'after'  =>  $date_string,
+                //'column' => 'post_date_gmt',
             ),
             'post_type' => $post_type,
             'post_status' => array(
@@ -4732,17 +4752,21 @@ class OP_Woo{
                 'wc-refunded',
                 'wc-on-hold',
             ),
-            'posts_per_page' => -1
+            'posts_per_page' => 50,
+            'orderby' => 'date',
+            'order' => 'DESC'
         );
+        
         $args = apply_filters('op_notification_order_query_args',$args);
         $orders = array();
         if($this->_enable_hpos)
         {
             $data_store = WC_Data_Store::load( 'order' );
             $posts = $data_store->query( $args );
+
         }else{
+            $args['date_query']['column'] = 'post_date_gmt';
             $query = new WP_Query($args);
-        
            
             $posts = $query->get_posts();
            
@@ -4777,7 +4801,7 @@ class OP_Woo{
            
         }
         
-        $orders = apply_filters('op_notice_orders_result',$orders);
+        $orders = apply_filters('op_notice_orders_result',$orders,$posts,$from_time,$session_data);
         
         if(!empty($orders))
         {
@@ -5415,6 +5439,12 @@ class OP_Woo{
     public function clear_all_product_cache(){
         return $this->_core->clear_all_product_cache();
     }
+    public function clear_expired_transient_cache(){
+        $this->_session->clear_expired_transient_cache();
+    }
+    public function clear_all_transient_cache(){
+        $this->_session->clear_all_transient_cache();
+    }
     public function getTaxDetails($tax_class,$rate_id = 0){
         
         $result = array('rate'=> 0,'compound' => '0','rate_id' => $rate_id,'shipping' => 'no','label' => 'Tax');
@@ -5448,7 +5478,7 @@ class OP_Woo{
     public function _formatSetting($setting)
     {
         global $op_woo;
-        $setting['pos_search_display_product'] = 'yes';
+        //$setting['pos_search_display_product'] = 'yes';
         $setting['pos_money'] = $this->_core->_formatCash($setting['pos_money']);
         $setting['pos_custom_cart_discount_amount'] = $this->_core->_formatDiscountAmount($setting['pos_custom_cart_discount_amount']);
         $setting['pos_custom_item_discount_amount'] = $this->_core->_formatDiscountAmount($setting['pos_custom_item_discount_amount']);

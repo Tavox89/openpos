@@ -161,8 +161,8 @@ if(!class_exists('OP_REST_API_Transaction'))
                 if($transaction_id)
                 {
                     
-                    $done_transaction_data = get_transient($done_transient_key);
-                    $transaction_data = get_transient($transient_key);
+                    $done_transaction_data = $this->session_class->get_transient($done_transient_key);
+                    $transaction_data = $this->session_class->get_transient($transient_key);
                     if ( false !== $done_transaction_data ) {
                         $result['response']['status'] = 1;
                         $result['response']['data'] = $done_transaction_data;
@@ -188,7 +188,7 @@ if(!class_exists('OP_REST_API_Transaction'))
                             }
                         }
     
-                        set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
+                        $this->session_class->set_transient( $transient_key, $transaction_data, MINUTE_IN_SECONDS );
                     
                         //start check transaction exist
                         $exist_transaction = $this->transaction_class->get_by_local_id($transaction_id);
@@ -223,7 +223,7 @@ if(!class_exists('OP_REST_API_Transaction'))
                                     add_post_meta($id,'_add_balance_amount',$balance);
                                 }
                             }
-                            set_transient( $done_transient_key, $id, DAY_IN_SECONDS );
+                            $this->session_class->set_transient( $done_transient_key, $id, DAY_IN_SECONDS );
                             $result['response']['status'] = 1;
                             $result['response']['data'] = $id;
                             if($is_new)
@@ -231,7 +231,7 @@ if(!class_exists('OP_REST_API_Transaction'))
                                 do_action('op_add_transaction_after',$id,$session_data,$transaction_data);
                             }
                         }
-                        delete_transient( $transient_key );
+                        $this->session_class->delete_transient( $transient_key );
                     }
                     
 

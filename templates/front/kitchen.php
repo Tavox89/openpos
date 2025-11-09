@@ -39,7 +39,7 @@ if(isset($_REQUEST['action']) && $_REQUEST['action'] == 'update_ready')
             $table_id = $tmp[1]; //end($tmp);
             $item_id = $tmp[0];
             $table_type = isset($tmp[2]) ? $tmp[2]: 'dine_in';
-            $table_data = $op_table->bill_screen_data($table_id,$table_type);
+            $table_data = $op_table->get_data($table_id,$table_type);
             $ver = $table_data['ver'];
             $online_ver = $table_data['online_ver'];
             if($online_ver > $ver)
@@ -98,7 +98,7 @@ if(isset($_REQUEST['action']) && $_REQUEST['action'] == 'get_data')
 
             $table_type = isset($table['dine_type'])? $table['dine_type'] :'dine_in';
            
-            $table_data = $op_table->bill_screen_data($table['id'],$table_type);
+            $table_data = $op_table->get_data($table['id'],$table_type);
             
             
             if(isset($table_data['parent']) && $table_data['parent'] == 0 && isset($table_data['items'])  && count($table_data['items']) > 0)
@@ -301,38 +301,8 @@ $temlate_file = apply_filters('kitchen_template_location',OPENPOS_DIR.'templates
     ?>
 
 </head>
-<body class="body-<?php echo $grid_type; ?>">
+<body class="body-<?php echo $grid_type; ?> dark-mode">
 <?php require_once($temlate_file); ?>
 
-<?php
-$handes = array(
-    'openpos.kitchen.script'
-);
-
-wp_print_scripts(apply_filters('openpos_kitchen_footer_js',$handes));
-?>
-
-<button id="button-notification" style="display: none;"  type="button"></button>
-
-<script type="text/javascript">
-
-    (function($) {
-
-        $(document).ready(function(){
-            $('#button-notification').on('click',function(){
-                $.playSound("<?php echo apply_filters('op_kitchen_notification_sound', OPENPOS_URL.'/assets/sound/helium.mp3');  ?>");
-            });
-            $('body').on('new-dish-come',function(){
-                $('#button-notification').trigger('click');
-            })
-
-        });
-    }(jQuery));
-
-</script>
-
-<style  type="text/css">
-  
-</style>
 </body>
 </html>

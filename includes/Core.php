@@ -490,7 +490,7 @@ class Openpos_Core
         if($barcode_field != 'post_id')
         {
             $barcode = get_post_meta($productId,$barcode_field,true);
-            if($barcode)
+            if($barcode && !is_array($barcode))
             {
                 $barcode =  ''.$barcode;
                 $barcode = strtolower($barcode);
@@ -657,7 +657,23 @@ class Openpos_Core
         {
             $final_args['_query_src'] = 'op_order_query';
             $data_store = WC_Data_Store::load( 'order' );
-            $orders = $data_store->query( $final_args );
+
+            $limit = 200;
+            $page  = 1;
+            $all_orders = [];
+            do {
+                $args = array_merge($final_args, [
+                    'limit' => $limit,
+                    'page'  => $page,
+                ]);
+                $batch = $data_store->query($args);
+                
+                $all_orders = array_merge($all_orders, $batch);
+                $page++;
+            } while (count($batch) === $limit);
+            $orders = $all_orders;
+
+            //$orders = $data_store->query( $final_args );
             return $orders;
         }else{
             $query = new WP_Query( $final_args );
@@ -717,7 +733,22 @@ class Openpos_Core
         {
             $final_args['_query_src'] = 'op_order_query';
             $data_store = WC_Data_Store::load( 'order' );
-            $orders = $data_store->query( $final_args );
+
+            $limit = 200;
+            $page  = 1;
+            $all_orders = [];
+            do {
+                $args = array_merge($final_args, [
+                    'limit' => $limit,
+                    'page'  => $page,
+                ]);
+                $batch = $data_store->query($args);
+                
+                $all_orders = array_merge($all_orders, $batch);
+                $page++;
+            } while (count($batch) === $limit);
+            $orders = $all_orders;
+            //$orders = $data_store->query( $final_args );
             return $orders;
         }else{
             $query = new WP_Query( $final_args );
@@ -754,6 +785,7 @@ class Openpos_Core
                     'inclusive' => true,
                 ),
             ),
+            'fields'         => 'ids', 
             'post_status'      => $config_status,
             'posts_per_page' => -1,
             'meta_query' => array(
@@ -776,8 +808,23 @@ class Openpos_Core
         {
             $final_args['_query_src'] = 'op_order_query';
             $data_store = WC_Data_Store::load( 'order' );
-            $orders = $data_store->query( $final_args );
-            
+            //$orders = $data_store->query( $final_args );
+
+            $limit = 200;
+            $page  = 1;
+            $all_orders = [];
+            do {
+                $args = array_merge($final_args, [
+                    'limit' => $limit,
+                    'page'  => $page,
+                ]);
+                $batch = $data_store->query($args);
+                
+                $all_orders = array_merge($all_orders, $batch);
+                $page++;
+            } while (count($batch) === $limit);
+    
+            $orders = $all_orders;
             return $orders;
         }else{
             $query = new WP_Query( $final_args );
@@ -1979,7 +2026,7 @@ class Openpos_Core
         $this->clear_product_cache($product_ids);
         
 
-        update_option('_openpos_product_version_'.$warehouse_id,$time);
+        $this->setProductDbVersion($warehouse_id,$time);
         do_action('op_add_product_change_after',$product_id,$warehouse_id,$time,$this);
     }
     public function clear_all_product_cache(){
@@ -2298,6 +2345,31 @@ class Openpos_Core
             $customer_url .= '/index.php?'.$params_str;
         }
         return $customer_url;
+    }
+    function get_queue_url($params = array()){
+
+        $value = get_option('openpos_queue_base', '');
+        $queue_url =  site_url('index.php?openpos_queue=1');
+        if($value)
+        {
+            $queue_url = home_url( '/'.$value.'/' );
+        }
+
+        $queue_url = apply_filters('op_queue_url',$queue_url);
+        if(!empty($params))
+        {
+            $params_str = http_build_query($params);
+            $queue_url = rtrim($queue_url,'/');
+            if(strpos($queue_url,'?') === false)
+            {
+                $queue_url .= '?';
+            }
+            else{
+                $queue_url .= '&';
+            }
+            $queue_url .=  $params_str;
+        }
+        return $queue_url;
     }
     function get_hosting_time($local_time,$client_time_offset = 0){ // in min
         $hosting_offset =  wc_timezone_offset();  // in second
@@ -2626,6 +2698,23 @@ class Openpos_Core
         $ten_power = pow(10,$decimal);
         $price = round($price * $ten_power)/$ten_power;
         return $price;
+    }
+
+    public function setProductDbVersion($warehouse_id,$version){
+        global $op_session;
+        update_option('_openpos_product_version_'.$warehouse_id,$version);
+        $op_session->set_transient('_openpos_product_version_'.$warehouse_id,$version,DAY_IN_SECONDS);
+    }
+    public function getProductDbVersion($warehouse_id){
+        global $op_session;
+        $transient_key = '_openpos_product_version_'.$warehouse_id;
+        $database_version = $op_session->get_transient($transient_key);
+        if($database_version === false)
+        {
+            $database_version = get_option($transient_key,0);
+        }
+        
+        return $database_version;
     }
     
 

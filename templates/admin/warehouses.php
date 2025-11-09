@@ -199,9 +199,6 @@ $countries = $op_woo->get_countries_and_states();
                                 <td>
                                     <span class="status-<?php echo esc_attr($warehouse['status']); ?>"><?php echo $warehouse['status'] == 'publish' ? 'Active' : 'Inactive'; ?></span>
                                 </td>
-<!--                                <td>-->
-<!--                                    --><?php //echo $warehouse['total_qty']; ?>
-<!--                                </td>-->
 
 
                             </tr>

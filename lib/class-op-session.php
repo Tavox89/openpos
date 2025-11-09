@@ -13,6 +13,7 @@ if(!class_exists('OP_Session'))
     class OP_Session{
         public $_filesystem;
         public $_session_path;
+        public $_cache_data_path;
         public $_clock_path;
         public $_base_path;
         function __construct($base_path = '')
@@ -31,6 +32,7 @@ if(!class_exists('OP_Session'))
             $this->_base_path =  $base_path;
             
             $this->_session_path =  $this->_base_path.'/sessions';
+            $this->_cache_data_path =  $this->_base_path.'/cache';
             $this->_clock_path =  $this->_base_path.'/clock';
             $this->init();
         }
@@ -57,6 +59,10 @@ if(!class_exists('OP_Session'))
             if(!file_exists($this->_clock_path))
             {
                 $this->_filesystem->mkdir($this->_clock_path,$chmod_dir);
+            }
+            if(!file_exists($this->_cache_data_path))
+            {
+                $this->_filesystem->mkdir($this->_cache_data_path,$chmod_dir);
             }
         }
         function generate_session_id($prefix = ''){
@@ -204,5 +210,76 @@ if(!class_exists('OP_Session'))
             return $result;
         }
 
+        public function delete_transient( $transient_key ){
+            $use_file = apply_filters('op_use_file_transient',true);
+            if($use_file)
+            {
+                $file = $this->_cache_data_path.'/' . md5( $transient_key ) . '.cache';
+                if ( file_exists( $file ) ) unlink( $file );
+                return true;
+            }else{
+                delete_transient( $transient_key );
+                return true;
+            }
+            
+            
+        }
+        public function get_transient($transient_key){
+            $use_file = apply_filters('op_use_file_transient',true);
+            if($use_file)
+            {
+                $file = $this->_cache_data_path.'/' . md5( $transient_key ) . '.cache';
+                if ( !file_exists( $file ) ) return false;
+
+                $data = unserialize( file_get_contents( $file ) );
+                if ( $data['expire'] && $data['expire'] < time() ) {
+                    unlink( $file );
+                    return false;
+                }
+                return $data['value'];
+            }else{
+                return get_transient($transient_key);
+            }
+        }
+        public function set_transient ($transient_key, $value, $expiration){
+            $use_file = apply_filters('op_use_file_transient',true);
+            if($use_file)
+            {
+                $file = $this->_cache_data_path.'/' . md5( $transient_key ) . '.cache';
+                $data = [
+                    'value' => $value,
+                    'expire' => $expiration ? time() + $expiration : 0,
+                ];
+                file_put_contents( $file, serialize( $data ) );
+                return true;
+            }else{
+                set_transient ($transient_key, $value, $expiration);
+            }
+        }
+        public function clear_expired_transient_cache(){
+            $cache_path = $this->_cache_data_path;
+            $list = $this->_filesystem->dirlist($cache_path,false);
+
+            foreach($list as $file_name => $l)
+            {
+                $file = $cache_path.'/'.$file_name;
+                if ( file_exists( $file ) ) {
+                    $data = unserialize( file_get_contents( $file ) );
+                    if ( $data['expire'] && $data['expire'] < time() ) {
+                        unlink( $file );
+                    }
+                }
+            }
+        }
+        public function clear_all_transient_cache(){
+            $cache_path = $this->_cache_data_path;
+            $list = $this->_filesystem->dirlist($cache_path,false);
+
+            foreach($list as $file_name => $l)
+            {
+                $file = $cache_path.'/'.$file_name;
+                if ( file_exists( $file ) ) unlink( $file );
+            }
+        }
     }
 }
